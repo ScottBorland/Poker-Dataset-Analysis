@@ -1,0 +1,107 @@
+============================================================
+  POKER ANALYSIS — EXAMPLE COMMANDS
+  Run all commands from the project root directory:
+  C:\Users\Scott\Documents\Claude_Projects\Poker Analysis
+============================================================
+
+------------------------------------------------------------
+PARSER
+------------------------------------------------------------
+
+# Load a single file and print a summary
+python src/parser.py "abs NLH handhq_1-OBFUSCATED.phhs"
+
+# Load all .phhs files in a directory
+python src/parser.py data/
+
+
+------------------------------------------------------------
+LABELLER
+------------------------------------------------------------
+
+# Auto-label all hands in a file (safe to re-run — duplicates are ignored)
+python src/labeller.py --file "abs NLH handhq_1-OBFUSCATED.phhs"
+
+# Auto-label all files in data/
+python src/labeller.py --dir data/
+
+# Only insert a specific label type
+python src/labeller.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --label squeeze
+
+# Manually add a label to a specific hand
+python src/labeller.py --add --hand-id 3017235114 --hand-file "abs NLH handhq_1-OBFUSCATED.phhs" --label hero_spot --note "interesting spot"
+
+
+------------------------------------------------------------
+ANALYSER
+------------------------------------------------------------
+
+# Overall stats (total hands labelled, unique labels, etc.)
+python src/analyser.py --stats
+
+# Count of every label type
+python src/analyser.py --counts
+
+# Show first 20 hands with a given label
+python src/analyser.py --label 3bet_pot --limit 20
+python src/analyser.py --label squeeze --limit 10
+python src/analyser.py --label showdown --limit 20
+
+# Show all labels applied to a specific hand
+python src/analyser.py --hand-id 3017300798
+python src/analyser.py --hand-id 3017239622
+
+
+------------------------------------------------------------
+REPLAYER  (requires pygame-ce: pip install pygame-ce)
+------------------------------------------------------------
+
+# Open the first hand in the file
+python src/replayer/main.py --file "abs NLH handhq_1-OBFUSCATED.phhs"
+
+# Open a specific hand by its ID
+python src/replayer/main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --hand 3017239622
+
+# Open by index (0-based)
+python src/replayer/main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --index 5
+
+# Open a 3bet pot hand
+python src/replayer/main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --hand 3017239622
+
+# Open a squeeze hand
+python src/analyser.py --label squeeze --limit 1
+# (copy the hand_id from the output, then:)
+# python src/replayer/main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --hand <hand_id>
+
+# Keyboard controls inside the replayer:
+#   Right / Space  — next action
+#   Left           — previous action
+#   R              — reset to start of hand
+#   N              — next hand
+#   P              — previous hand
+#   Q / Escape     — quit
+
+
+------------------------------------------------------------
+JUPYTER NOTEBOOK
+------------------------------------------------------------
+
+# Install dependencies first if needed
+pip install jupyter pandas matplotlib
+
+# Launch the exploration notebook
+jupyter notebook notebooks/exploration.ipynb
+
+# The notebook will:
+#   - Load all hands from the .phhs file
+#   - Build a summary DataFrame
+#   - Plot player count, pot size, and preflop aggression distributions
+#   - Run the auto-labeller and show label counts
+
+
+------------------------------------------------------------
+INSTALL ALL DEPENDENCIES
+------------------------------------------------------------
+
+pip install -r requirements.txt
+pip install pygame-ce

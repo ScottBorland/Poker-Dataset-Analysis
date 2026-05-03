@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Data files (large, not versioned)
+*.phhs
+data/
+
+# Generated database
+labels/labels.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Claude Code
+.claude/

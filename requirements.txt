@@ -1,0 +1,7 @@
+pygame>=2.5
+pandas>=2.0
+numpy>=1.25
+pokerkit
+treys
+jupyter
+matplotlib
