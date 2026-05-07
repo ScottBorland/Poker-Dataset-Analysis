@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS player_hands (
     n_players   INTEGER NOT NULL,
     position    TEXT,
     stack       REAL,
+    invested    REAL,
     winnings    REAL,
     net_won     REAL,
     saw_flop    INTEGER NOT NULL DEFAULT 0,
@@ -75,6 +76,7 @@ def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     for col, defn in [
         ("net_won",   "REAL"),
         ("n_players", "INTEGER NOT NULL DEFAULT 0"),
+        ("invested",  "REAL"),
     ]:
         try:
             conn.execute(f"ALTER TABLE player_hands ADD COLUMN {col} {defn}")
@@ -134,6 +136,7 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
                 hand.n_players,
                 positions.get(seat_idx),
                 hand.starting_stacks[i],
+                invested,
                 gross,
                 net_won,
                 1 if seat_idx in flop_set else 0,
@@ -147,8 +150,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
 
     conn.executemany(
         "INSERT OR IGNORE INTO player_hands"
-        "(player_id, hand_id, file, seat_idx, n_players, position, stack, winnings, net_won, saw_flop, went_to_sd)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "(player_id, hand_id, file, seat_idx, n_players, position, stack, invested, winnings, net_won, saw_flop, went_to_sd)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         player_rows,
     )
     conn.executemany(
