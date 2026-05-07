@@ -142,6 +142,8 @@ CREATE TABLE player_hands (
     net_won     REAL,               -- winnings - invested; NULL when winnings is NULL
     saw_flop    INTEGER NOT NULL DEFAULT 0,
     went_to_sd  INTEGER NOT NULL DEFAULT 0,
+    vpip        INTEGER NOT NULL DEFAULT 0,  -- 1 if player voluntarily put money in preflop
+    pfr         INTEGER NOT NULL DEFAULT 0,  -- 1 if player raised preflop
     PRIMARY KEY (player_id, hand_id)
 );
 
@@ -301,9 +303,10 @@ from scripts import *
 
 | Function | Returns | Description |
 |---|---|---|
-| `top_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Best players; `by` also accepts `'net_won_pre_rake'` |
-| `bottom_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Biggest losers |
-| `player_stats(player_id)` | `dict` | Overall P&L + breakdown by position and label |
+| `top_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Best players; includes `vpip_pct`, `pfr_pct`; `by` also accepts `'net_won_pre_rake'` |
+| `bottom_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Biggest losers; includes `vpip_pct`, `pfr_pct` |
+| `vpip_pfr_stats(min_hands=100)` | `DataFrame` | VPIP%, PFR%, and aggression factor for all players with enough hands |
+| `player_stats(player_id)` | `dict` | Overall P&L + `vpip_pct`, `pfr_pct` + breakdown by position and label |
 | `player_hand_history(player_id, label=None)` | `DataFrame` | Every hand for a player, optionally filtered to a label |
 
 ### Hand lookup & labels
@@ -341,6 +344,9 @@ hands_with_label('squeeze')
 
 pot_type_stats()
 rake_stats()                 # {'raked_hands': 596, 'total_rake': 168.55, ...}
+
+vpip_pfr_stats(min_hands=100)  # VPIP%, PFR%, AF, net_won per player
+# top_players / bottom_players / player_stats all include vpip_pct and pfr_pct
 ```
 
 ---
