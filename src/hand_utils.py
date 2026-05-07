@@ -252,6 +252,44 @@ def went_to_showdown(hand: 'Hand') -> bool:
     return any('sm' in a for a in hand.actions)
 
 
+def compute_vpip_pfr(hand: 'Hand') -> list[tuple[bool, bool]]:
+    """
+    Return (vpip, pfr) per player (0-indexed).
+
+    VPIP — Voluntarily Put money In Pot: any preflop call or raise,
+           excluding the BB checking their option when no one has raised.
+    PFR  — Pre-Flop Raise: any preflop cbr action.
+    """
+    n = hand.n_players
+    vpip = [False] * n
+    pfr  = [False] * n
+    preflop_raised = False
+
+    for action in hand.actions:
+        if action.startswith('d db'):
+            break
+        if action.startswith('d dh'):
+            continue
+        parts = action.split()
+        if len(parts) < 2 or not parts[0].startswith('p') or not parts[0][1:].isdigit():
+            continue
+
+        pidx = int(parts[0][1:]) - 1
+        verb = parts[1]
+
+        if verb == 'cbr':
+            vpip[pidx] = True
+            pfr[pidx]  = True
+            preflop_raised = True
+        elif verb == 'cc':
+            # BB checking their option (no prior raise) is not voluntary
+            if pidx == 1 and not preflop_raised:
+                continue
+            vpip[pidx] = True
+
+    return list(zip(vpip, pfr))
+
+
 def players_who_saw_flop(hand: 'Hand') -> list[int]:
     """Return list of 1-based player indices still in when flop was dealt."""
     folded: set[int] = set()

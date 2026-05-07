@@ -181,10 +181,12 @@ def top_players(
         else:
             query = f"""
                 SELECT player_id,
-                       COUNT(*)                   hands,
-                       ROUND(SUM(invested), 2)    total_invested,
-                       ROUND(SUM(net_won), 2)     net_won,
-                       ROUND(AVG(net_won), 4)     avg_per_hand
+                       COUNT(*)                              hands,
+                       ROUND(100.0*SUM(vpip)/COUNT(*), 1)   vpip_pct,
+                       ROUND(100.0*SUM(pfr) /COUNT(*), 1)   pfr_pct,
+                       ROUND(SUM(invested), 2)               total_invested,
+                       ROUND(SUM(net_won), 2)                net_won,
+                       ROUND(AVG(net_won), 4)                avg_per_hand
                 FROM player_hands
                 WHERE net_won IS NOT NULL
                 GROUP BY player_id
@@ -209,10 +211,12 @@ def bottom_players(
     try:
         query = f"""
             SELECT player_id,
-                   COUNT(*)                   hands,
-                   ROUND(SUM(invested), 2)    total_invested,
-                   ROUND(SUM(net_won), 2)     net_won,
-                   ROUND(AVG(net_won), 4)     avg_per_hand
+                   COUNT(*)                              hands,
+                   ROUND(100.0*SUM(vpip)/COUNT(*), 1)   vpip_pct,
+                   ROUND(100.0*SUM(pfr) /COUNT(*), 1)   pfr_pct,
+                   ROUND(SUM(invested), 2)               total_invested,
+                   ROUND(SUM(net_won), 2)                net_won,
+                   ROUND(AVG(net_won), 4)                avg_per_hand
             FROM player_hands
             WHERE net_won IS NOT NULL
             GROUP BY player_id
@@ -221,6 +225,39 @@ def bottom_players(
             LIMIT ?
         """
         return pd.read_sql(query, conn, params=[min_hands, n])
+    finally:
+        if should_close:
+            conn.close()
+
+
+def vpip_pfr_stats(
+    min_hands: int = 100,
+    con: sqlite3.Connection | None = None,
+) -> pd.DataFrame:
+    """
+    Return VPIP%, PFR%, and aggression factor for all players with enough hands.
+    Sorted by hands descending so high-volume regulars appear first.
+
+    VPIP%  — % of hands player voluntarily put money in preflop
+    PFR%   — % of hands player raised preflop
+    AF     — PFR / (VPIP - PFR); aggression factor (ratio of raises to calls preflop)
+    """
+    conn, should_close = _con(con)
+    try:
+        return pd.read_sql("""
+            SELECT player_id,
+                   COUNT(*)                                        hands,
+                   ROUND(100.0 * SUM(vpip) / COUNT(*), 1)         vpip_pct,
+                   ROUND(100.0 * SUM(pfr)  / COUNT(*), 1)         pfr_pct,
+                   ROUND(CASE WHEN SUM(vpip) - SUM(pfr) = 0 THEN NULL
+                         ELSE 1.0 * SUM(pfr) / (SUM(vpip) - SUM(pfr))
+                         END, 2)                                   af,
+                   ROUND(SUM(net_won), 2)                          net_won
+            FROM player_hands
+            GROUP BY player_id
+            HAVING hands >= ?
+            ORDER BY hands DESC
+        """, conn, params=[min_hands])
     finally:
         if should_close:
             conn.close()
@@ -241,12 +278,14 @@ def player_stats(
     conn, should_close = _con(con)
     try:
         overall = pd.read_sql("""
-            SELECT COUNT(*)                hands,
-                   ROUND(SUM(invested),2)  total_invested,
-                   ROUND(SUM(net_won),2)   net_won,
-                   ROUND(AVG(net_won),4)   avg_per_hand,
-                   ROUND(100.0*SUM(saw_flop)/COUNT(*),1)   flop_seen_pct,
-                   ROUND(100.0*SUM(went_to_sd)/COUNT(*),1) showdown_pct
+            SELECT COUNT(*)                                  hands,
+                   ROUND(100.0*SUM(vpip)/COUNT(*), 1)        vpip_pct,
+                   ROUND(100.0*SUM(pfr) /COUNT(*), 1)        pfr_pct,
+                   ROUND(SUM(invested),2)                    total_invested,
+                   ROUND(SUM(net_won),2)                     net_won,
+                   ROUND(AVG(net_won),4)                     avg_per_hand,
+                   ROUND(100.0*SUM(saw_flop)/COUNT(*),1)     flop_seen_pct,
+                   ROUND(100.0*SUM(went_to_sd)/COUNT(*),1)   showdown_pct
             FROM player_hands WHERE player_id = ?
         """, conn, params=[player_id]).iloc[0].to_dict()
 

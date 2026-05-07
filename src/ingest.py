@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from parser import Hand, load_file
 from hand_utils import (
     assign_positions, players_who_saw_flop, went_to_showdown, compute_investments,
+    compute_vpip_pfr,
 )
 from labeller import label_hand
 
@@ -47,6 +48,8 @@ CREATE TABLE IF NOT EXISTS player_hands (
     net_won     REAL,
     saw_flop    INTEGER NOT NULL DEFAULT 0,
     went_to_sd  INTEGER NOT NULL DEFAULT 0,
+    vpip        INTEGER NOT NULL DEFAULT 0,
+    pfr         INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (player_id, hand_id)
 );
 
@@ -77,6 +80,8 @@ def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
         ("net_won",   "REAL"),
         ("n_players", "INTEGER NOT NULL DEFAULT 0"),
         ("invested",  "REAL"),
+        ("vpip",      "INTEGER NOT NULL DEFAULT 0"),
+        ("pfr",       "INTEGER NOT NULL DEFAULT 0"),
     ]:
         try:
             conn.execute(f"ALTER TABLE player_hands ADD COLUMN {col} {defn}")
@@ -122,12 +127,14 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
         positions = assign_positions(hand)
         flop_set = set(players_who_saw_flop(hand))
         investments = compute_investments(hand)
+        vpip_pfr = compute_vpip_pfr(hand)
 
         for seat_idx, player_id in enumerate(hand.players, start=1):
             i = seat_idx - 1
             gross = hand.winnings[i] if hand.winnings is not None else None
             invested = investments[i]
             net_won = (gross - invested) if gross is not None else None
+            v, p = vpip_pfr[i]
             player_rows.append((
                 player_id,
                 hand.hand_id,
@@ -141,6 +148,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
                 net_won,
                 1 if seat_idx in flop_set else 0,
                 1 if _player_went_to_sd(hand, seat_idx) else 0,
+                1 if v else 0,
+                1 if p else 0,
             ))
 
         for lr in label_hand(hand):
@@ -150,8 +159,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
 
     conn.executemany(
         "INSERT OR IGNORE INTO player_hands"
-        "(player_id, hand_id, file, seat_idx, n_players, position, stack, invested, winnings, net_won, saw_flop, went_to_sd)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "(player_id, hand_id, file, seat_idx, n_players, position, stack, invested, winnings, net_won, saw_flop, went_to_sd, vpip, pfr)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         player_rows,
     )
     conn.executemany(
