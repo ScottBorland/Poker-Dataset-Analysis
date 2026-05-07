@@ -20,7 +20,9 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
 from parser import Hand, load_file
-from hand_utils import assign_positions, players_who_saw_flop, went_to_showdown
+from hand_utils import (
+    assign_positions, players_who_saw_flop, went_to_showdown, compute_investments,
+)
 from labeller import label_hand
 
 DB_PATH = Path(__file__).parent.parent / 'db' / 'poker.db'
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS player_hands (
     position    TEXT,
     stack       REAL,
     winnings    REAL,
+    net_won     REAL,
     saw_flop    INTEGER NOT NULL DEFAULT 0,
     went_to_sd  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (player_id, hand_id)
@@ -68,6 +71,12 @@ def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.executescript(SCHEMA)
+    # migrate: add net_won column if this is an older database
+    try:
+        conn.execute("ALTER TABLE player_hands ADD COLUMN net_won REAL")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     return conn
 
 
@@ -106,18 +115,22 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
     for hand in hands:
         positions = assign_positions(hand)
         flop_set = set(players_who_saw_flop(hand))
+        investments = compute_investments(hand)
 
         for seat_idx, player_id in enumerate(hand.players, start=1):
-            winnings = (hand.winnings[seat_idx - 1]
-                        if hand.winnings is not None else None)
+            i = seat_idx - 1
+            gross = hand.winnings[i] if hand.winnings is not None else None
+            invested = investments[i]
+            net_won = (gross - invested) if gross is not None else None
             player_rows.append((
                 player_id,
                 hand.hand_id,
                 filename,
                 seat_idx,
                 positions.get(seat_idx),
-                hand.starting_stacks[seat_idx - 1],
-                winnings,
+                hand.starting_stacks[i],
+                gross,
+                net_won,
                 1 if seat_idx in flop_set else 0,
                 1 if _player_went_to_sd(hand, seat_idx) else 0,
             ))
@@ -129,8 +142,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
 
     conn.executemany(
         "INSERT OR IGNORE INTO player_hands"
-        "(player_id, hand_id, file, seat_idx, position, stack, winnings, saw_flop, went_to_sd)"
-        " VALUES (?,?,?,?,?,?,?,?,?)",
+        "(player_id, hand_id, file, seat_idx, position, stack, winnings, net_won, saw_flop, went_to_sd)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
         player_rows,
     )
     conn.executemany(

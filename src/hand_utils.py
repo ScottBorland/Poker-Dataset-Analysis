@@ -126,6 +126,80 @@ def final_pot(hand: 'Hand') -> float:
     return hist[-1] if hist else sum(hand.blinds_or_straddles) + sum(hand.antes)
 
 
+def compute_investments(hand: 'Hand') -> list[float]:
+    """
+    Return the total chips each player put into the pot (0-indexed).
+    Covers blinds, antes, all calls and bets across every street.
+    Uncalled raises are returned to the raiser so the sum equals the pot.
+    Used to compute net P&L: net_won = gross_winnings - invested.
+    """
+    n = hand.n_players
+    stacks = list(hand.starting_stacks)
+    invested = [0.0] * n
+    street_bets = [0.0] * n
+
+    def _return_uncalled() -> None:
+        max_bet = max(street_bets)
+        if max_bet == 0.0:
+            return
+        leaders = [j for j, b in enumerate(street_bets) if abs(b - max_bet) < 1e-9]
+        if len(leaders) == 1:
+            second = max(
+                (b for j, b in enumerate(street_bets) if j not in leaders),
+                default=0.0,
+            )
+            j = leaders[0]
+            refund = max_bet - second
+            invested[j] -= refund
+            street_bets[j] = second
+
+    for i, ante in enumerate(hand.antes[:n]):
+        if ante > 0:
+            amt = min(ante, stacks[i])
+            stacks[i] -= amt
+            invested[i] += amt
+            street_bets[i] += amt
+
+    for i, blind in enumerate(hand.blinds_or_straddles[:n]):
+        if blind > 0:
+            amt = min(blind, stacks[i])
+            stacks[i] -= amt
+            invested[i] += amt
+            street_bets[i] += amt
+
+    for action in hand.actions:
+        parts = action.split()
+
+        if action.startswith('d db'):
+            _return_uncalled()
+            street_bets = [0.0] * n
+
+        elif (len(parts) >= 2
+              and parts[0].startswith('p')
+              and parts[0][1:].isdigit()):
+            pidx = int(parts[0][1:]) - 1
+            verb = parts[1]
+
+            if verb == 'cbr' and len(parts) >= 3:
+                total_bet = float(parts[2])
+                additional = max(total_bet - street_bets[pidx], 0.0)
+                additional = min(additional, stacks[pidx])
+                stacks[pidx] -= additional
+                invested[pidx] += additional
+                street_bets[pidx] += additional
+
+            elif verb == 'cc':
+                facing = max(street_bets) if street_bets else 0.0
+                additional = max(facing - street_bets[pidx], 0.0)
+                additional = min(additional, stacks[pidx])
+                stacks[pidx] -= additional
+                invested[pidx] += additional
+                street_bets[pidx] += additional
+
+    _return_uncalled()
+    return invested
+
+
 # ---------------------------------------------------------------------------
 # Position assignment
 # ---------------------------------------------------------------------------
