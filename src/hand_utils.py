@@ -208,7 +208,7 @@ POSITION_NAMES_6 = {0: 'SB', 1: 'BB', 2: 'UTG', 3: 'HJ', 4: 'CO', 5: 'BTN'}
 POSITION_NAMES_5 = {0: 'SB', 1: 'BB', 2: 'UTG', 3: 'CO', 4: 'BTN'}
 POSITION_NAMES_4 = {0: 'SB', 1: 'BB', 2: 'UTG', 3: 'BTN'}
 POSITION_NAMES_3 = {0: 'SB', 1: 'BB', 2: 'BTN'}
-POSITION_NAMES_2 = {0: 'SB/BTN', 1: 'BB'}
+POSITION_NAMES_2 = {0: 'BTN', 1: 'BB'}
 
 _POSITION_MAPS = {
     2: POSITION_NAMES_2,

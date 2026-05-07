@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS player_hands (
     hand_id     INTEGER NOT NULL,
     file        TEXT NOT NULL,
     seat_idx    INTEGER NOT NULL,
+    n_players   INTEGER NOT NULL,
     position    TEXT,
     stack       REAL,
     winnings    REAL,
@@ -71,12 +72,15 @@ def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.executescript(SCHEMA)
-    # migrate: add net_won column if this is an older database
-    try:
-        conn.execute("ALTER TABLE player_hands ADD COLUMN net_won REAL")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
+    for col, defn in [
+        ("net_won",   "REAL"),
+        ("n_players", "INTEGER NOT NULL DEFAULT 0"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE player_hands ADD COLUMN {col} {defn}")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
     return conn
 
 
@@ -127,6 +131,7 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
                 hand.hand_id,
                 filename,
                 seat_idx,
+                hand.n_players,
                 positions.get(seat_idx),
                 hand.starting_stacks[i],
                 gross,
@@ -142,8 +147,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
 
     conn.executemany(
         "INSERT OR IGNORE INTO player_hands"
-        "(player_id, hand_id, file, seat_idx, position, stack, winnings, net_won, saw_flop, went_to_sd)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "(player_id, hand_id, file, seat_idx, n_players, position, stack, winnings, net_won, saw_flop, went_to_sd)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         player_rows,
     )
     conn.executemany(
