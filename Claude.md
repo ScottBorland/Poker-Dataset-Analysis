@@ -133,9 +133,11 @@ CREATE TABLE player_hands (
     hand_id     INTEGER NOT NULL,
     file        TEXT NOT NULL,
     seat_idx    INTEGER NOT NULL,   -- 1-indexed
+    n_players   INTEGER NOT NULL,   -- total players seated in this hand
     position    TEXT,               -- 'BTN' | 'SB' | 'BB' | 'UTG' | 'HJ' | 'CO'
     stack       REAL,
-    winnings    REAL,               -- NULL when absent from source hand
+    winnings    REAL,               -- gross chips received from pot; NULL when absent from source
+    net_won     REAL,               -- winnings - invested; NULL when winnings is NULL
     saw_flop    INTEGER NOT NULL DEFAULT 0,
     went_to_sd  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (player_id, hand_id)
@@ -165,11 +167,12 @@ CREATE INDEX idx_label_hand ON labels(hand_id);
 import sqlite3, pandas as pd
 con = sqlite3.connect('db/poker.db')
 
-# Player earnings leaderboard
+# Net P&L leaderboard (use net_won, not winnings — winnings is gross chips received)
 pd.read_sql("""
-    SELECT player_id, COUNT(*) hands, SUM(winnings) earnings
-    FROM player_hands WHERE winnings IS NOT NULL
-    GROUP BY player_id ORDER BY earnings DESC
+    SELECT player_id, COUNT(*) hands, ROUND(SUM(net_won), 2) net_won
+    FROM player_hands WHERE net_won IS NOT NULL
+    GROUP BY player_id HAVING hands >= 5
+    ORDER BY net_won DESC
 """, con)
 
 # All hands for a specific player
@@ -182,20 +185,22 @@ pd.read_sql("""
 
 # Player stats in 3bet pots only
 pd.read_sql("""
-    SELECT ph.player_id, COUNT(*) hands, SUM(ph.winnings) earnings
+    SELECT ph.player_id, COUNT(*) hands, ROUND(SUM(ph.net_won), 2) net_won
     FROM player_hands ph
     JOIN labels l ON ph.hand_id = l.hand_id
-    WHERE l.label = '3bet_pot' AND ph.winnings IS NOT NULL
-    GROUP BY ph.player_id ORDER BY earnings DESC
+    WHERE l.label = '3bet_pot' AND ph.net_won IS NOT NULL
+    GROUP BY ph.player_id ORDER BY net_won DESC
 """, con)
 
-# Positional win rates
+# Positional net P&L — filter by n_players to compare like-for-like
 pd.read_sql("""
-    SELECT position, COUNT(*) hands,
-           AVG(CASE WHEN winnings > 0 THEN 1.0 ELSE 0.0 END) win_rate,
-           SUM(winnings) total_earnings
-    FROM player_hands WHERE winnings IS NOT NULL
-    GROUP BY position ORDER BY total_earnings DESC
+    SELECT position, n_players, COUNT(*) hands,
+           ROUND(SUM(net_won), 2) net_won,
+           ROUND(100.0 * SUM(saw_flop) / COUNT(*), 1) flop_seen_pct,
+           ROUND(100.0 * SUM(went_to_sd) / COUNT(*), 1) showdown_pct
+    FROM player_hands
+    WHERE n_players = 6
+    GROUP BY position ORDER BY net_won DESC
 """, con)
 ```
 
@@ -310,15 +315,20 @@ The pot is not stored directly — reconstruct it from actions:
 2. For each `cbr X` action: the raise amount is `X - player_current_bet_this_street`
 3. Track per-player street contributions separately; reset each street
 
-### Position Assignment (6-max example)
+### Position Assignment
 
-With `blinds_or_straddles = [0.25, 0.50, 0, 0, 0, 0]`:
-- p1 = SB
-- p2 = BB
-- p3 = UTG (first to act preflop)
-- p6 = BTN (last to act preflop, first postflop... except SB/BB)
+Positions are assigned by `assign_positions()` in `hand_utils.py` based on player count:
 
-Button is the player with the highest index before p1/p2, i.e. `N_players` in a full orbit.
+| Players | Labels assigned |
+|---------|----------------|
+| 2 | BTN, BB |
+| 3 | BTN, SB, BB |
+| 4 | BTN, UTG, SB, BB |
+| 5 | BTN, CO, UTG, SB, BB |
+| 6 | BTN, CO, HJ, UTG, SB, BB |
+| 7+ | p1–pN (no named positions) |
+
+In heads-up, p1 is the BTN (posts SB, acts last postflop). `n_players` is stored in `player_hands` so positional stats can be filtered by game size — always filter `WHERE n_players = 6` when comparing 6-max positions.
 
 ### Detecting 3-Bets
 
