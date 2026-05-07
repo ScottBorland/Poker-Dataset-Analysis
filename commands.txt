@@ -5,6 +5,32 @@
 ============================================================
 
 ------------------------------------------------------------
+INGEST  (populates db/poker.db — run this first)
+------------------------------------------------------------
+
+# Ingest all .phhs files in the project root (incremental — safe to re-run)
+python src/ingest.py
+
+# Ingest from a specific directory
+python src/ingest.py --data-dir data/
+
+# Force re-ingest one file (removes its old rows first)
+python src/ingest.py --reprocess "abs NLH handhq_1-OBFUSCATED.phhs"
+
+# Wipe db/poker.db and re-ingest everything from scratch
+python src/ingest.py --reprocess-all
+
+# Quick sanity check after ingest
+python -c "
+import sqlite3, pandas as pd
+con = sqlite3.connect('db/poker.db')
+print(pd.read_sql('SELECT * FROM ingested_files', con).to_string())
+print(pd.read_sql('SELECT COUNT(*) total_rows, COUNT(DISTINCT player_id) players, COUNT(DISTINCT hand_id) hands FROM player_hands', con).to_string())
+print(pd.read_sql('SELECT label, COUNT(*) cnt FROM labels GROUP BY label ORDER BY cnt DESC', con).to_string())
+"
+
+
+------------------------------------------------------------
 PARSER
 ------------------------------------------------------------
 
@@ -87,10 +113,10 @@ JUPYTER NOTEBOOK
 ------------------------------------------------------------
 
 # Install dependencies first if needed
-pip install jupyter pandas matplotlib
+pip install notebook pandas matplotlib
 
 # Launch the exploration notebook
-jupyter notebook notebooks/exploration.ipynb
+python -m notebook notebooks/exploration.ipynb
 
 # The notebook will:
 #   - Load all hands from the .phhs file
