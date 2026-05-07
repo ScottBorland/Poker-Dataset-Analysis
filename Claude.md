@@ -559,6 +559,7 @@ matplotlib
 
 ## Notes & Gotchas
 
+- **Never read `.phhs` files directly** — they are large (thousands of hands each). Always use `load()` / `load_all()` from `scripts.py` or `load_file()` / `load_directory()` from `parser.py`. The folder `phhs files/` may contain the full dataset and must not be grepped, catted, or read line-by-line.
 - **`winnings` can be absent** — some hands (especially all-ins where opponent cards aren't shown) have no `winnings` field. Handle with `.get()`.
 - **Cards use two-char notation** — rank then suit: `Ah` = Ace of hearts, `Tc` = Ten of clubs. Valid suits: `h d c s`.
 - **`????` means unknown cards** — hole cards are only revealed at showdown via `sm` actions. Most hands never reveal cards.
