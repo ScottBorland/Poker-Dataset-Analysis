@@ -88,21 +88,24 @@ winnings = [0, 0, 0, 4.55, 0, 0]
 ## Project Structure
 
 ```
-poker-analysis/
-├── claude.md                  # This file
-├── data/
-│   └── *.phhs                 # Raw hand history files
+Poker Analysis/
+├── Claude.md                  # This file
+├── *.phhs                     # Raw hand history files (not committed to git)
+├── db/
+│   └── poker.db               # Primary SQLite database (not committed to git)
 ├── labels/
-│   └── labels.db              # SQLite label store (see Labelling System)
+│   └── labels.db              # Manual label store for labeller.py / analyser.py
 ├── src/
+│   ├── ingest.py              # One-time (incremental) ingestion script
 │   ├── parser.py              # .phhs parser → Hand dataclass
 │   ├── hand_utils.py          # Derived features (street detection, pot sizes, positions)
-│   ├── labeller.py            # CLI tool for tagging hands
-│   ├── analyser.py            # Query & aggregate labelled hands
+│   ├── labeller.py            # CLI tool for tagging hands (writes to labels.db)
+│   ├── analyser.py            # Query & aggregate labelled hands (reads labels.db)
 │   └── replayer/
 │       ├── main.py            # pygame entry point
 │       ├── renderer.py        # Drawing logic
 │       └── state.py           # Hand state machine for step-through replay
+├── commands.txt               # Example CLI commands
 ├── notebooks/
 │   └── exploration.ipynb      # Exploratory analysis
 └── requirements.txt
@@ -110,35 +113,172 @@ poker-analysis/
 
 ---
 
+## Database (`db/poker.db`)
+
+The primary database is `db/poker.db`. It is populated by `src/ingest.py` and is the main source for player-level analysis. Do not commit it to git.
+
+### Schema
+
+```sql
+-- Tracks which files have been ingested (enables incremental re-runs)
+CREATE TABLE ingested_files (
+    filename    TEXT PRIMARY KEY,
+    ingested_at TEXT DEFAULT (datetime('now')),
+    hand_count  INTEGER
+);
+
+-- One row per player per hand
+CREATE TABLE player_hands (
+    player_id   TEXT NOT NULL,
+    hand_id     INTEGER NOT NULL,
+    file        TEXT NOT NULL,
+    seat_idx    INTEGER NOT NULL,   -- 1-indexed
+    position    TEXT,               -- 'BTN' | 'SB' | 'BB' | 'UTG' | 'HJ' | 'CO'
+    stack       REAL,
+    winnings    REAL,               -- NULL when absent from source hand
+    saw_flop    INTEGER NOT NULL DEFAULT 0,
+    went_to_sd  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (player_id, hand_id)
+);
+
+-- Auto-labels applied at ingest time (mirrors labels.db schema)
+CREATE TABLE labels (
+    hand_id     INTEGER NOT NULL,
+    file        TEXT NOT NULL,
+    label       TEXT NOT NULL,
+    street      TEXT,
+    player_idx  INTEGER,
+    note        TEXT,
+    created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX idx_unique_label ON labels(hand_id, label, COALESCE(player_idx, -1));
+CREATE INDEX idx_player     ON player_hands(player_id);
+CREATE INDEX idx_ph_hand    ON player_hands(hand_id);
+CREATE INDEX idx_label      ON labels(label);
+CREATE INDEX idx_label_hand ON labels(hand_id);
+```
+
+### Common Queries
+
+```python
+import sqlite3, pandas as pd
+con = sqlite3.connect('db/poker.db')
+
+# Player earnings leaderboard
+pd.read_sql("""
+    SELECT player_id, COUNT(*) hands, SUM(winnings) earnings
+    FROM player_hands WHERE winnings IS NOT NULL
+    GROUP BY player_id ORDER BY earnings DESC
+""", con)
+
+# All hands for a specific player
+pd.read_sql("SELECT * FROM player_hands WHERE player_id = ?", con, params=[player_id])
+
+# Hands where player saw the flop
+pd.read_sql("""
+    SELECT * FROM player_hands WHERE player_id = ? AND saw_flop = 1
+""", con, params=[player_id])
+
+# Player stats in 3bet pots only
+pd.read_sql("""
+    SELECT ph.player_id, COUNT(*) hands, SUM(ph.winnings) earnings
+    FROM player_hands ph
+    JOIN labels l ON ph.hand_id = l.hand_id
+    WHERE l.label = '3bet_pot' AND ph.winnings IS NOT NULL
+    GROUP BY ph.player_id ORDER BY earnings DESC
+""", con)
+
+# Positional win rates
+pd.read_sql("""
+    SELECT position, COUNT(*) hands,
+           AVG(CASE WHEN winnings > 0 THEN 1.0 ELSE 0.0 END) win_rate,
+           SUM(winnings) total_earnings
+    FROM player_hands WHERE winnings IS NOT NULL
+    GROUP BY position ORDER BY total_earnings DESC
+""", con)
+```
+
+---
+
+## Ingestion System (`src/ingest.py`)
+
+`src/ingest.py` parses `.phhs` files and populates `db/poker.db`. It is incremental by design — files already recorded in `ingested_files` are skipped unless a reprocess flag is given.
+
+### Usage
+
+```bash
+# Ingest all .phhs files in the project root (default)
+python src/ingest.py
+
+# Ingest from a specific directory
+python src/ingest.py --data-dir data/
+
+# Force re-ingest one file (removes its old rows first)
+python src/ingest.py --reprocess "abs NLH handhq_1-OBFUSCATED.phhs"
+
+# Wipe and re-ingest everything from scratch
+python src/ingest.py --reprocess-all
+```
+
+### What gets written per hand
+
+- One `player_hands` row per seated player, with position, stack, winnings, `saw_flop`, `went_to_sd`
+- All auto-labels from `label_hand()` (same logic as `labeller.py`)
+- One `ingested_files` row recording the filename and hand count
+
+**Note:** `poker.db` contains auto-labels only. Manual labels added via `labeller.py --add` live in `labels/labels.db` and are never touched by re-ingestion.
+
+---
+
 ## Labelling System
 
-### Recommended Storage: SQLite
+### Storage
 
-Use a single `labels/labels.db` SQLite database. This allows:
-- Fast filtered queries across millions of labels
-- Multiple labels per hand
-- Metadata (notes, confidence, analyst)
-- Easy export to pandas via `pd.read_sql`
+Labels from manual review live in `labels/labels.db` (SQLite). Use `src/labeller.py` to populate it and `src/analyser.py` to query it. Auto-labels are also written to `db/poker.db` during ingestion.
 
 ### Schema
 
 ```sql
 CREATE TABLE labels (
-    hand_id     INTEGER NOT NULL,   -- matches hand field in .phhs
-    file        TEXT NOT NULL,      -- source .phhs filename
+    hand_id     INTEGER NOT NULL,
+    file        TEXT NOT NULL,
     label       TEXT NOT NULL,      -- e.g. '3bet_pot', 'squeeze'
     street      TEXT,               -- 'preflop' | 'flop' | 'turn' | 'river' | NULL
-    player_idx  INTEGER,            -- 1-indexed player, NULL if hand-level label
-    note        TEXT,               -- optional free-text annotation
-    created_at  TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (hand_id, label, player_idx)
+    player_idx  INTEGER,            -- 1-indexed, NULL if hand-level label
+    note        TEXT,
+    created_at  TEXT DEFAULT (datetime('now'))
 );
 
+CREATE UNIQUE INDEX idx_unique_label ON labels(hand_id, label, COALESCE(player_idx, -1));
 CREATE INDEX idx_label ON labels(label);
 CREATE INDEX idx_hand  ON labels(hand_id);
 ```
 
-### Label Taxonomy (starting suggestions)
+### Common Queries
+
+```python
+import sqlite3, pandas as pd
+con = sqlite3.connect('labels/labels.db')
+
+# Count of each label type
+pd.read_sql("SELECT label, COUNT(*) cnt FROM labels GROUP BY label ORDER BY cnt DESC", con)
+
+# All hands with a given label
+pd.read_sql("SELECT * FROM labels WHERE label = ?", con, params=['3bet_pot'])
+
+# All labels applied to a specific hand
+pd.read_sql("SELECT label, street FROM labels WHERE hand_id = ?", con, params=[hand_id])
+
+# Hands with both 3bet_pot and squeeze
+pd.read_sql("""
+    SELECT hand_id FROM labels WHERE label = '3bet_pot'
+    INTERSECT
+    SELECT hand_id FROM labels WHERE label = 'squeeze'
+""", con)
+```
+
+### Label Taxonomy
 
 **Preflop situation:**
 - `rfi` — raise first in
@@ -157,7 +297,7 @@ CREATE INDEX idx_hand  ON labels(hand_id);
 - `showdown` — hand goes to showdown
 - `all_in_preflop` — all-in committed before flop
 
-Labels can be auto-detected via `labeller.py` or manually assigned.
+Auto-labels are written to both `labels.db` (via `labeller.py --file` / `--dir`) and `poker.db` (via `ingest.py`). Manual labels can be added to `labels.db` only with `labeller.py --add`.
 
 ---
 
@@ -290,10 +430,11 @@ matplotlib
 ## Development Workflow
 
 1. **Parse** — build `parser.py` to load all hands from a `.phhs` file into a list of `Hand` dataclasses
-2. **Explore** — use a Jupyter notebook to sanity-check counts, stack distributions, action frequencies
-3. **Label** — build auto-labellers for common spots; add a simple CLI (`labeller.py`) for manual review
-4. **Analyse** — query `labels.db` to pull hand subsets; compute stats with pandas
-5. **Replay** — build pygame replayer last, feeding it parsed `Hand` objects
+2. **Ingest** — run `ingest.py` to populate `db/poker.db` from all `.phhs` files; auto-labels applied here
+3. **Explore** — use a Jupyter notebook to sanity-check counts, stack distributions, action frequencies
+4. **Label** — add manual labels via `labeller.py`; add new auto-label rules to `ingest.py` and re-run
+5. **Analyse** — query `poker.db` via pandas to study player stats, earnings, labelled subsets
+6. **Replay** — build pygame replayer last, feeding it parsed `Hand` objects
 
 ---
 
@@ -304,20 +445,4 @@ matplotlib
 - **`????` means unknown cards** — hole cards are only revealed at showdown via `sm` actions. Most hands never reveal cards.
 - **`cbr` amounts are absolute** — the amount is the total bet/raise size facing opponents, not the additional chips going in.
 - **Multi-file dataset** — write the parser to accept a directory glob, not a single file path.
-- **Obfuscated player IDs** — cross-file player tracking is possible via the base64 ID strings, but treat them as opaque keys.
-
-## Git Workflow
-
-After completing any code change, run:
-  git add -A
-  git commit -m "<type>: <description>"
-
-Commit message format: conventional commits — feat:, fix:, refactor:, docs:, chore:
-Be specific: `feat: add 3bet detection to labeller` not `update labeller.py`
-
-Branch strategy:
-- Default: commit to current branch
-- Create a new branch only if explicitly asked, using kebab-case: feat/squeeze-detection
-
-Never commit: .pyc files, __pycache__, .db files, .env, large data files (*.phhs)
-Add a .gitignore covering the above before the first commit.
+- **`.gitignore`** — must exclude `data/*.phhs`, `db/poker.db`, `__pycache__`, `*.pyc`, `.env`.
