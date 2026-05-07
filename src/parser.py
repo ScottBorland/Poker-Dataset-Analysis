@@ -1,6 +1,9 @@
 """
 parser.py — Load .phhs hand history files into Hand dataclasses.
 
+Uses pokerkit's HandHistory.load_all() (Absolute Poker format) as the parsing
+backend. The Hand dataclass is preserved for downstream compatibility.
+
 Usage:
     from parser import load_file, load_directory
 
@@ -10,11 +13,11 @@ Usage:
 
 from __future__ import annotations
 
-import ast
-import re
-from dataclasses import dataclass, field
+import warnings
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+
+from pokerkit import HandHistory
 
 
 # ---------------------------------------------------------------------------
@@ -54,106 +57,55 @@ class Hand:
 
 
 # ---------------------------------------------------------------------------
-# Parser helpers
+# Conversion helper
 # ---------------------------------------------------------------------------
 
-# Matches a section header like [1], [42], etc.
-_SECTION_RE = re.compile(r'^\[(\d+)\]\s*$')
-
-
-def _parse_value(raw: str):
-    """
-    Convert a raw string value from the .phhs format to a Python object.
-    Handles: bool literals, lists, quoted strings, ints, floats.
-    """
-    raw = raw.strip()
-
-    # Boolean literals (lowercase in the file)
-    if raw == 'true':
-        return True
-    if raw == 'false':
-        return False
-
-    # Try ast.literal_eval for lists and quoted strings
-    try:
-        return ast.literal_eval(raw)
-    except (ValueError, SyntaxError):
-        pass
-
-    # Bare time value like 00:00:01
-    return raw
-
-
-def _parse_block(lines: list[str], source_file: str) -> Hand | None:
-    """Parse a single key=value block into a Hand. Returns None on failure."""
-    kv: dict = {}
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith('['):
-            continue
-        if '=' not in line:
-            continue
-        key, _, rest = line.partition('=')
-        kv[key.strip()] = _parse_value(rest.strip())
-
-    if not kv:
-        return None
-
-    try:
-        return Hand(
-            hand_id=int(kv['hand']),
-            file=source_file,
-            variant=kv.get('variant', 'NT'),
-            ante_trimming_status=bool(kv.get('ante_trimming_status', False)),
-            antes=[float(x) for x in kv.get('antes', [])],
-            blinds_or_straddles=[float(x) for x in kv.get('blinds_or_straddles', [])],
-            min_bet=float(kv.get('min_bet', 0.0)),
-            starting_stacks=[float(x) for x in kv.get('starting_stacks', [])],
-            actions=list(kv.get('actions', [])),
-            venue=kv.get('venue', ''),
-            time=str(kv.get('time', '')),
-            day=int(kv.get('day', 0)),
-            month=int(kv.get('month', 0)),
-            year=int(kv.get('year', 0)),
-            seats=[int(x) for x in kv.get('seats', [])],
-            table=kv.get('table', ''),
-            players=list(kv.get('players', [])),
-            winnings=[float(x) for x in kv['winnings']] if 'winnings' in kv else None,
-            currency_symbol=kv.get('currency_symbol', '$'),
-            time_zone_abbreviation=kv.get('time_zone_abbreviation', 'ET'),
-        )
-    except (KeyError, TypeError, ValueError) as exc:
-        print(f"[parser] Skipping malformed hand in {source_file}: {exc}")
-        return None
+def _hh_to_hand(hh: HandHistory, source_file: str) -> Hand:
+    """Map a pokerkit HandHistory to our Hand dataclass."""
+    udf = hh.user_defined_fields or {}
+    return Hand(
+        hand_id=hh.hand,
+        file=source_file,
+        variant=hh.variant or 'NT',
+        ante_trimming_status=bool(hh.ante_trimming_status),
+        antes=[float(a) for a in hh.antes] if hh.antes else [],
+        blinds_or_straddles=[float(b) for b in hh.blinds_or_straddles] if hh.blinds_or_straddles else [],
+        min_bet=float(hh.min_bet) if hh.min_bet is not None else 0.0,
+        starting_stacks=[float(s) for s in hh.starting_stacks] if hh.starting_stacks else [],
+        actions=list(hh.actions) if hh.actions else [],
+        venue=hh.venue or '',
+        time=str(hh.time) if hh.time is not None else '',
+        day=hh.day or 0,
+        month=hh.month or 0,
+        year=hh.year or 0,
+        seats=[int(s) for s in hh.seats] if hh.seats else [],
+        table=hh.table or '',
+        players=list(hh.players) if hh.players else [],
+        winnings=[float(w) for w in hh.winnings] if hh.winnings else None,
+        currency_symbol=hh.currency_symbol or '$',
+        time_zone_abbreviation=udf.get('time_zone_abbreviation', 'ET'),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-def _iter_blocks(path: Path) -> Iterator[list[str]]:
-    """Yield raw line-lists for each [N] section in a .phhs file."""
-    current: list[str] = []
-    with path.open(encoding='utf-8', errors='replace') as fh:
-        for line in fh:
-            if _SECTION_RE.match(line):
-                if current:
-                    yield current
-                current = [line]
-            else:
-                current.append(line)
-    if current:
-        yield current
-
-
 def load_file(path: str | Path) -> list[Hand]:
-    """Parse all hands from a single .phhs file."""
+    """Parse all hands from a single .phhs file using pokerkit."""
     path = Path(path)
+    # Suppress pokerkit warnings for unknown fields and benign state warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=UserWarning, module='pokerkit')
+        with path.open('rb') as fh:
+            hh_list = list(HandHistory.load_all(fh))
+
     hands: list[Hand] = []
-    for block in _iter_blocks(path):
-        hand = _parse_block(block, path.name)
-        if hand is not None:
-            hands.append(hand)
+    for hh in hh_list:
+        try:
+            hands.append(_hh_to_hand(hh, path.name))
+        except Exception as exc:
+            print(f"[parser] Skipping malformed hand in {path.name}: {exc}")
     return hands
 
 
