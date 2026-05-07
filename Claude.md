@@ -101,6 +101,7 @@ Poker Analysis/
 │   ├── hand_utils.py          # Derived features (street detection, pot sizes, positions)
 │   ├── labeller.py            # CLI tool for tagging hands (writes to labels.db)
 │   ├── analyser.py            # Query & aggregate labelled hands (reads labels.db)
+│   ├── scripts.py             # High-level convenience API for notebooks/REPL
 │   └── replayer/
 │       ├── main.py            # pygame entry point
 │       ├── renderer.py        # Drawing logic
@@ -259,6 +260,88 @@ python src/ingest.py --reprocess-all
 - One `ingested_files` row recording the filename and hand count
 
 **Note:** `poker.db` contains auto-labels only. Manual labels added via `labeller.py --add` live in `labels/labels.db` and are never touched by re-ingestion.
+
+---
+
+## Scripts API (`src/scripts.py`)
+
+High-level convenience functions for interactive use in notebooks or a REPL. All database functions accept an optional `con` keyword — pass an existing connection to avoid repeated open/close in loops; omit it and a fresh connection is opened and closed automatically.
+
+```python
+import sys; sys.path.insert(0, 'src')
+from scripts import *
+```
+
+### Data loading
+
+| Function | Returns | Description |
+|---|---|---|
+| `load(path)` | `list[Hand]` | Load all hands from a single `.phhs` file |
+| `load_all(folder='.')` | `list[Hand]` | Load all `.phhs` files in a folder |
+| `connect(db_path)` | `Connection` | Open a connection to `poker.db` (caller closes) |
+
+### Ingestion & labelling
+
+| Function | Description |
+|---|---|
+| `ingest(folder='.', reprocess=None, reprocess_all=False)` | Ingest `.phhs` files into `poker.db` |
+| `add_labels(path_or_folder)` | Run auto-labeller and write to `labels/labels.db` |
+
+### Overview
+
+| Function | Returns | Description |
+|---|---|---|
+| `summary()` | — | Print hands, players, label counts, and rake totals |
+| `label_counts()` | `DataFrame` | Count of each label type |
+| `rake_stats()` | `dict` | Total/avg rake over hands with known winnings |
+| `pot_type_stats(pot_types)` | `DataFrame` | P&L and showdown % by preflop situation |
+| `positional_stats(n_players=6)` | `DataFrame` | P&L by position; pass `None` for all sizes |
+
+### Player analysis
+
+| Function | Returns | Description |
+|---|---|---|
+| `top_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Best players; `by` also accepts `'net_won_pre_rake'` |
+| `bottom_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Biggest losers |
+| `player_stats(player_id)` | `dict` | Overall P&L + breakdown by position and label |
+| `player_hand_history(player_id, label=None)` | `DataFrame` | Every hand for a player, optionally filtered to a label |
+
+### Hand lookup & labels
+
+| Function | Returns | Description |
+|---|---|---|
+| `hand_details(hand_id)` | `dict` | Player rows and label list for one hand |
+| `hands_with_label(label, limit=20)` | `DataFrame` | Player rows for hands carrying a label |
+
+### Example session
+
+```python
+from scripts import *
+
+summary()
+# Files ingested : 1 | Hands : 1,000 | Players : 151 | Rake : $168.55
+
+top_players(5)
+top_players(5, by='net_won_pre_rake')
+bottom_players(5)
+
+positional_stats(6)          # 6-max only
+positional_stats(2)          # heads-up only
+positional_stats(None)       # all sizes
+
+stats = player_stats('gaItR0R1G3KUo6rFvO7WSA')
+stats['overall']             # dict: hands, net_won, flop_seen_pct, ...
+stats['by_position']         # DataFrame
+stats['by_label']            # DataFrame
+
+player_hand_history('gaItR0R1G3KUo6rFvO7WSA', label='3bet_pot')
+
+hand_details(3017235114)     # {'hand_id': ..., 'players': DataFrame, 'labels': [...]}
+hands_with_label('squeeze')
+
+pot_type_stats()
+rake_stats()                 # {'raked_hands': 596, 'total_rake': 168.55, ...}
+```
 
 ---
 
