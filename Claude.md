@@ -542,19 +542,21 @@ pygame>=2.5
 pandas>=2.0
 numpy>=1.25
 sqlite3          # stdlib
-pokerkit         # optional: hand evaluation / equity calc
+pokerkit>=0.7    # primary parser — .phhs is pokerkit's native format
 treys            # fast hand evaluator (Cactus Kev)
 jupyter
 matplotlib
 ```
 
-**`pokerkit`** is worth investigating — the `.phhs` format appears to be its native format, so a parser may already exist.
+**`pokerkit`** is the parsing backend for `src/parser.py`. The `.phhs` format is pokerkit's native TOML-based hand history format. Use `HandHistory.load_all(fh)` (binary file handle) to load all hands from a `.phhs` file — it returns an iterator of `HandHistory` objects.
+
+`HandHistory.from_absolute_poker(s)` is a *different* method that converts raw Absolute Poker casino text logs (not `.phhs`) into `HandHistory` objects. Our dataset is already in `.phhs` format, so `load_all` is the correct entry point.
 
 ---
 
 ## Development Workflow
 
-1. **Parse** — build `parser.py` to load all hands from a `.phhs` file into a list of `Hand` dataclasses
+1. **Parse** — `parser.py` uses `pokerkit.HandHistory.load_all()` to load `.phhs` files into a list of `Hand` dataclasses
 2. **Ingest** — run `ingest.py` to populate `db/poker.db` from all `.phhs` files; auto-labels applied here
 3. **Explore** — use a Jupyter notebook to sanity-check counts, stack distributions, action frequencies
 4. **Label** — add manual labels via `labeller.py`; add new auto-label rules to `ingest.py` and re-run
