@@ -31,6 +31,96 @@ print(pd.read_sql('SELECT label, COUNT(*) cnt FROM labels GROUP BY label ORDER B
 
 
 ------------------------------------------------------------
+SCRIPTS API  (interactive — use in a notebook or python -c)
+------------------------------------------------------------
+
+# Start an interactive session
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import *
+
+summary()
+"
+
+# Top/bottom player leaderboards
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import top_players, bottom_players
+print(top_players(10))
+print(bottom_players(10))
+print(top_players(10, by='net_won_pre_rake'))
+"
+
+# Positional stats (6-max)
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import positional_stats
+print(positional_stats(6))
+"
+
+# Pot type breakdown
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import pot_type_stats
+print(pot_type_stats())
+"
+
+# Rake summary
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import rake_stats
+print(rake_stats())
+"
+
+# Player deep-dive
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import player_stats, player_hand_history
+pid = 'gaItR0R1G3KUo6rFvO7WSA'
+stats = player_stats(pid)
+print(stats['overall'])
+print(stats['by_position'])
+print(stats['by_label'])
+print(player_hand_history(pid, label='3bet_pot'))
+"
+
+# Hands with a specific label
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import hands_with_label, label_counts
+print(label_counts())
+print(hands_with_label('squeeze', limit=10))
+"
+
+# Hand details by ID
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import hand_details
+d = hand_details(3017239622)
+print('Labels:', d['labels'])
+print(d['players'])
+"
+
+# Load hands from file (returns list[Hand] objects)
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import load, load_all
+hands = load('abs NLH handhq_1-OBFUSCATED.phhs')
+print(f'Loaded {len(hands)} hands')
+hands_all = load_all('.')
+print(f'Loaded {len(hands_all)} hands from all files')
+"
+
+# Ingest and label via scripts API
+python -c "
+import sys; sys.path.insert(0, 'src')
+from scripts import ingest, add_labels
+ingest('.')
+add_labels('abs NLH handhq_1-OBFUSCATED.phhs')
+"
+
+
+------------------------------------------------------------
 PARSER
 ------------------------------------------------------------
 
