@@ -136,6 +136,7 @@ CREATE TABLE player_hands (
     n_players   INTEGER NOT NULL,   -- total players seated in this hand
     position    TEXT,               -- 'BTN' | 'SB' | 'BB' | 'UTG' | 'HJ' | 'CO'
     stack       REAL,
+    invested    REAL,               -- total chips put into pot (blinds + all bets/calls, uncalled bets returned)
     winnings    REAL,               -- gross chips received from pot; NULL when absent from source
     net_won     REAL,               -- winnings - invested; NULL when winnings is NULL
     saw_flop    INTEGER NOT NULL DEFAULT 0,
@@ -201,6 +202,31 @@ pd.read_sql("""
     FROM player_hands
     WHERE n_players = 6
     GROUP BY position ORDER BY net_won DESC
+""", con)
+
+# Rake analysis — rake = sum(invested) - sum(winnings) per hand, split proportionally
+# Only valid for hands where all players have known winnings
+pd.read_sql("""
+    WITH hand_rake AS (
+        SELECT hand_id,
+               SUM(invested)                 total_invested,
+               SUM(invested) - SUM(winnings) rake
+        FROM player_hands
+        GROUP BY hand_id
+        HAVING SUM(CASE WHEN winnings IS NULL THEN 1 ELSE 0 END) = 0
+          AND SUM(invested) - SUM(winnings) >= 0
+    )
+    SELECT ph.player_id,
+           COUNT(*)                                                    hands,
+           ROUND(SUM(hr.rake * ph.invested / hr.total_invested), 2)   rake_paid,
+           ROUND(SUM(ph.net_won), 2)                                   net_won,
+           ROUND(SUM(ph.net_won)
+               + SUM(hr.rake * ph.invested / hr.total_invested), 2)   net_won_pre_rake
+    FROM player_hands ph
+    JOIN hand_rake hr ON ph.hand_id = hr.hand_id
+    WHERE ph.net_won IS NOT NULL
+    GROUP BY ph.player_id HAVING hands >= 5
+    ORDER BY net_won_pre_rake DESC
 """, con)
 ```
 
