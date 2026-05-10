@@ -23,6 +23,13 @@ if TYPE_CHECKING:
 _SRC = Path(__file__).parent
 _ROOT = _SRC.parent
 _POKER_DB = _ROOT / 'db' / 'poker.db'
+
+# Rank ordering high→low for canonical hand notation
+_RANKS = list('AKQJT98765432')
+_RANK_IDX = {r: i for i, r in enumerate(_RANKS)}
+
+# Module-level cache so 888poker files are only parsed once per session
+_888_hands_cache: list | None = None
 _LABELS_DB = _ROOT / 'labels' / 'labels.db'
 
 
@@ -543,3 +550,216 @@ def summary(con: sqlite3.Connection | None = None) -> None:
     finally:
         if should_close:
             conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Starting-hand analysis + replayer launcher
+# ---------------------------------------------------------------------------
+
+def _load_888_hands() -> list:
+    """Load all 888poker Hand objects, cached for the session."""
+    global _888_hands_cache
+    if _888_hands_cache is None:
+        import sys
+        sys.path.insert(0, str(_SRC))
+        from parser_888 import load_file_888
+        data_dir = _ROOT / 'data' / '888poker'
+        if not data_dir.is_dir():
+            raise FileNotFoundError(f"888poker data directory not found: {data_dir}")
+        _888_hands_cache = []
+        for f in sorted(data_dir.glob('*.txt')):
+            if 'Summary' not in f.name:
+                _888_hands_cache.extend(load_file_888(f))
+        print(f"[hand_replay] Loaded {len(_888_hands_cache)} 888poker hands into cache")
+    return _888_hands_cache
+
+
+def _cards_to_canonical(cards: str) -> str | None:
+    """'KdQs' → 'KQo',  'AsAh' → 'AA',  '????' → None."""
+    if len(cards) != 4 or '?' in cards:
+        return None
+    r1, s1, r2, s2 = cards[0], cards[1], cards[2], cards[3]
+    if r1 not in _RANK_IDX or r2 not in _RANK_IDX:
+        return None
+    if _RANK_IDX[r1] > _RANK_IDX[r2]:
+        r1, r2, s1, s2 = r2, r1, s2, s1
+    if r1 == r2:
+        return r1 + r2
+    return r1 + r2 + ('s' if s1 == s2 else 'o')
+
+
+def _parse_hand_query(hand: str) -> list[str]:
+    """
+    Normalise user input into a list of canonical forms to match.
+      'AQs' → ['AQs']
+      'AQo' → ['AQo']
+      'AQ'  → ['AQs', 'AQo']   (both suited and offsuit)
+      'AA'  → ['AA']
+    """
+    hand = hand.strip()
+    if len(hand) == 2:
+        r1, r2 = hand[0].upper(), hand[1].upper()
+        if r1 not in _RANK_IDX or r2 not in _RANK_IDX:
+            raise ValueError(f"Invalid hand: {hand!r}")
+        if _RANK_IDX[r1] > _RANK_IDX[r2]:
+            r1, r2 = r2, r1
+        return [r1 + r2] if r1 == r2 else [r1 + r2 + 's', r1 + r2 + 'o']
+    elif len(hand) == 3:
+        r1, r2, suf = hand[0].upper(), hand[1].upper(), hand[2].lower()
+        if r1 not in _RANK_IDX or r2 not in _RANK_IDX or suf not in ('s', 'o'):
+            raise ValueError(f"Invalid hand: {hand!r}. Use 'AQs', 'KTo', 'AA', or 'AQ'")
+        if _RANK_IDX[r1] > _RANK_IDX[r2]:
+            r1, r2 = r2, r1
+        if r1 == r2:
+            raise ValueError(f"Pairs cannot be suited/offsuit: use '{r1}{r2}'")
+        return [r1 + r2 + suf]
+    else:
+        raise ValueError(f"Invalid hand: {hand!r}. Use 'AQs', 'KTo', 'AA', or 'AQ'")
+
+
+def hand_replay(
+    hand: str,
+    position: str | None = None,
+    label: str | None = None,
+    player_id: str = 'ScottyWotty',
+    con: sqlite3.Connection | None = None,
+) -> dict:
+    """
+    Find all hands where *player_id* was dealt a specific starting hand,
+    print stats, and launch the pygame replayer on those hands.
+
+    Args:
+        hand:      Starting hand, e.g. 'AQs', 'KK', 'T9o', 'AK' (matches both suited & offsuit)
+        position:  Optional filter: 'BTN' | 'CO' | 'HJ' | 'UTG' | 'SB' | 'BB'
+        label:     Optional situation label: '3bet_pot' | 'squeeze' | 'single_raised_pot' | ...
+        player_id: Whose hole cards to match (default: 'ScottyWotty')
+
+    Returns:
+        dict with keys 'stats' (dict), 'by_position' (DataFrame), 'hands' (list[Hand])
+
+    Example:
+        hand_replay('AQs')
+        hand_replay('AQs', position='BTN')
+        hand_replay('AQ', label='3bet_pot')
+        hand_replay('KK', position='SB')
+    """
+    import sys
+    sys.path.insert(0, str(_SRC))
+
+    targets = set(_parse_hand_query(hand))
+
+    # Load (or retrieve cached) 888poker hands
+    all_hands = _load_888_hands()
+
+    # Filter by hole cards
+    matching_hands = []
+    for h in all_hands:
+        if player_id not in h.players:
+            continue
+        pidx = h.players.index(player_id) + 1  # 1-based
+        prefix = f'd dh p{pidx} '
+        for action in h.actions:
+            if action.startswith(prefix):
+                canonical = _cards_to_canonical(action[len(prefix):])
+                if canonical in targets:
+                    matching_hands.append(h)
+                break
+
+    if not matching_hands:
+        print(f"No hands found for {hand!r}")
+        return {'stats': {}, 'by_position': pd.DataFrame(), 'hands': []}
+
+    matching_ids = [h.hand_id for h in matching_hands]
+
+    # Query db for stats and apply optional filters via a temp table
+    conn, should_close = _con(con)
+    try:
+        conn.execute("CREATE TEMP TABLE IF NOT EXISTS _hr_ids (hand_id INTEGER PRIMARY KEY)")
+        conn.execute("DELETE FROM _hr_ids")
+        conn.executemany("INSERT OR IGNORE INTO _hr_ids VALUES (?)", [(i,) for i in matching_ids])
+
+        label_join  = "JOIN labels l ON ph.hand_id = l.hand_id" if label else ""
+        pos_clause  = "AND ph.position = :pos" if position else ""
+        lbl_clause  = "AND l.label = :lbl" if label else ""
+        params = {'pid': player_id, 'pos': position, 'lbl': label}
+
+        base_query = f"""
+            FROM player_hands ph
+            JOIN _hr_ids hi ON ph.hand_id = hi.hand_id
+            {label_join}
+            WHERE ph.player_id = :pid
+            {pos_clause}
+            {lbl_clause}
+        """
+
+        overall = conn.execute(f"""
+            SELECT COUNT(DISTINCT ph.hand_id)                       hands,
+                   ROUND(SUM(ph.net_won), 2)                        net_won,
+                   ROUND(AVG(ph.net_won) * 100, 2)                  per_100,
+                   ROUND(100.0 * SUM(ph.saw_flop)   / COUNT(*), 1)  flop_pct,
+                   ROUND(100.0 * SUM(ph.went_to_sd) / COUNT(*), 1)  sd_pct,
+                   ROUND(100.0 * SUM(ph.vpip) / COUNT(*), 1)        vpip_pct,
+                   ROUND(100.0 * SUM(ph.pfr)  / COUNT(*), 1)        pfr_pct
+            {base_query}
+        """, params).fetchone()
+
+        by_position = pd.read_sql(f"""
+            SELECT ph.position,
+                   COUNT(DISTINCT ph.hand_id)      hands,
+                   ROUND(SUM(ph.net_won), 2)        net_won,
+                   ROUND(AVG(ph.net_won) * 100, 2)  per_100
+            {base_query}
+            GROUP BY ph.position ORDER BY net_won DESC
+        """, conn, params=params)
+
+        # Hand IDs that pass all filters (for replayer)
+        filtered_ids = {
+            r[0] for r in conn.execute(
+                f"SELECT DISTINCT ph.hand_id {base_query}", params
+            ).fetchall()
+        }
+    finally:
+        if should_close:
+            conn.close()
+
+    stats = {
+        'hand': hand, 'targets': sorted(targets),
+        'hands': overall[0], 'net_won': overall[1], 'per_100': overall[2],
+        'flop_pct': overall[3], 'sd_pct': overall[4],
+        'vpip_pct': overall[5], 'pfr_pct': overall[6],
+    }
+
+    filtered_hands = [h for h in matching_hands if h.hand_id in filtered_ids]
+
+    # Print summary
+    filter_parts = [hand]
+    if position:
+        filter_parts.append(f'@ {position}')
+    if label:
+        filter_parts.append(f'[{label}]')
+    title = '  ' + '  '.join(filter_parts)
+
+    print(f"\n{'='*48}")
+    print(title)
+    print(f"{'='*48}")
+    if overall[0]:
+        print(f"  Hands      : {overall[0]}")
+        print(f"  Net P&L    : ${overall[1]:+.2f}   (${overall[2]:+.2f}/100)")
+        print(f"  Flop seen  : {overall[3]}%")
+        print(f"  Showdown   : {overall[4]}%")
+        print(f"  VPIP / PFR : {overall[5]}% / {overall[6]}%")
+        if not by_position.empty:
+            print()
+            print(by_position.to_string(index=False))
+    else:
+        print("  No hands match the given filters.")
+    print()
+
+    if not filtered_hands:
+        return {'stats': stats, 'by_position': by_position, 'hands': []}
+
+    print(f"Launching replayer with {len(filtered_hands)} hands  (N/P to navigate, Q to quit)...")
+    from replayer.main import run
+    run(filtered_hands)
+
+    return {'stats': stats, 'by_position': by_position, 'hands': filtered_hands}
