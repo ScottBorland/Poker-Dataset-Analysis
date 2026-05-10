@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
 from parser import Hand, load_file
+from parser_888 import load_file_888
 from hand_utils import (
     assign_positions, players_who_saw_flop, went_to_showdown, compute_investments,
     compute_vpip_pfr,
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS player_hands (
     went_to_sd  INTEGER NOT NULL DEFAULT 0,
     vpip        INTEGER NOT NULL DEFAULT 0,
     pfr         INTEGER NOT NULL DEFAULT 0,
+    venue       TEXT NOT NULL DEFAULT 'absolute_poker',
     PRIMARY KEY (player_id, hand_id)
 );
 
@@ -82,6 +84,7 @@ def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
         ("invested",  "REAL"),
         ("vpip",      "INTEGER NOT NULL DEFAULT 0"),
         ("pfr",       "INTEGER NOT NULL DEFAULT 0"),
+        ("venue",     "TEXT NOT NULL DEFAULT 'absolute_poker'"),
     ]:
         try:
             conn.execute(f"ALTER TABLE player_hands ADD COLUMN {col} {defn}")
@@ -113,10 +116,13 @@ def _player_went_to_sd(hand: Hand, player_idx: int) -> bool:
     return went_to_showdown(hand)
 
 
-def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
-    """Parse one .phhs file and upsert its data. Returns number of hands ingested."""
+def ingest_file(conn: sqlite3.Connection, path: Path, venue: str = 'absolute_poker') -> int:
+    """Parse one hand history file and upsert its data. Returns number of hands ingested."""
     filename = path.name
-    hands = load_file(path)
+    if venue == '888poker':
+        hands = load_file_888(path)
+    else:
+        hands = load_file(path)
     if not hands:
         return 0
 
@@ -150,6 +156,7 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
                 1 if _player_went_to_sd(hand, seat_idx) else 0,
                 1 if v else 0,
                 1 if p else 0,
+                venue,
             ))
 
         for lr in label_hand(hand):
@@ -159,8 +166,9 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
 
     conn.executemany(
         "INSERT OR IGNORE INTO player_hands"
-        "(player_id, hand_id, file, seat_idx, n_players, position, stack, invested, winnings, net_won, saw_flop, went_to_sd, vpip, pfr)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "(player_id, hand_id, file, seat_idx, n_players, position, stack, invested,"
+        " winnings, net_won, saw_flop, went_to_sd, vpip, pfr, venue)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         player_rows,
     )
     conn.executemany(
@@ -176,11 +184,36 @@ def ingest_file(conn: sqlite3.Connection, path: Path) -> int:
     return len(hands)
 
 
+def _collect_sources(data_dir: Path) -> list[tuple[Path, str]]:
+    """
+    Return list of (path, venue) pairs from data_dir.
+    Looks for .phhs files in data_dir/phhs files/ and .txt files in data_dir/888poker/.
+    Falls back to scanning data_dir itself for .phhs if subdirs are absent.
+    """
+    sources: list[tuple[Path, str]] = []
+
+    phhs_dir = data_dir / 'phhs files'
+    if phhs_dir.is_dir():
+        sources.extend((p, 'absolute_poker') for p in sorted(phhs_dir.glob('*.phhs')))
+    else:
+        sources.extend((p, 'absolute_poker') for p in sorted(data_dir.glob('*.phhs')))
+
+    poker888_dir = data_dir / '888poker'
+    if poker888_dir.is_dir():
+        sources.extend(
+            (p, '888poker')
+            for p in sorted(poker888_dir.glob('*.txt'))
+            if 'Summary' not in p.name
+        )
+
+    return sources
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description='Ingest .phhs files into db/poker.db')
+    ap = argparse.ArgumentParser(description='Ingest hand history files into db/poker.db')
     ap.add_argument(
-        '--data-dir', default='.',
-        help='Directory containing .phhs files (default: project root)',
+        '--data-dir', default='data',
+        help='Root data directory (default: data/). Scans data/phhs files/ and data/888poker/',
     )
     ap.add_argument('--reprocess', metavar='FILENAME',
                     help='Force re-ingest one specific file')
@@ -194,14 +227,14 @@ def main() -> None:
     done = _ingested_files(conn)
 
     data_dir = Path(args.data_dir)
-    phhs_files = sorted(data_dir.glob('*.phhs'))
+    sources = _collect_sources(data_dir)
 
-    if not phhs_files:
-        print(f'[ingest] No .phhs files found in {data_dir.resolve()}')
+    if not sources:
+        print(f'[ingest] No hand history files found under {data_dir.resolve()}')
         conn.close()
         return
 
-    for path in phhs_files:
+    for path, venue in sources:
         filename = path.name
         force = args.reprocess_all or (filename == args.reprocess)
 
@@ -212,8 +245,8 @@ def main() -> None:
             print(f'[ingest] Skipping {filename} (already ingested)')
             continue
 
-        print(f'[ingest] Ingesting {filename}...')
-        n = ingest_file(conn, path)
+        print(f'[ingest] Ingesting {filename} [{venue}]...')
+        n = ingest_file(conn, path, venue=venue)
         print(f'[ingest] {filename}: {n} hands')
 
     conn.close()

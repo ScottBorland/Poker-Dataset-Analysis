@@ -31,6 +31,8 @@ BTN_NORMAL  = (60,  100, 160)
 BTN_HOVER   = (80,  130, 200)
 BTN_TEXT    = (255, 255, 255)
 ACTIVE_HL   = (255, 215,   0)
+PLAYER_HL   = (0,   210, 185)   # teal: tracked player's seat
+PLAYER_HL_BG = (0,   55,  50)   # dark teal fill for tracked player's box
 PANEL_BG    = (20,   20,  20)
 LOG_BG      = (15,   15,  15)
 
@@ -70,11 +72,18 @@ def draw_card(surf: pygame.Surface, card: str, cx: int, cy: int,
     rank, suit = card[0], card[1]
     suit_sym = {'h': '♥', 'd': '♦', 'c': '♣', 's': '♠'}.get(suit, suit)
     color = CARD_RED if suit in ('h', 'd') else CARD_BLACK
+    label = rank + suit_sym
 
-    font = _font(16, bold=True)
-    draw_text(surf, rank + suit_sym, (rect.left + 3, rect.top + 2), font, color)
-    # Rotated text for bottom-right (simple approach: just draw it upright)
-    draw_text(surf, rank + suit_sym, (rect.right - 22, rect.bottom - 18), font, color)
+    if w >= 34:
+        # Large card (community): label top-left + mirrored bottom-right
+        font = _font(16, bold=True)
+        draw_text(surf, label, (rect.left + 3, rect.top + 2), font, color)
+        draw_text(surf, label, (rect.right - 22, rect.bottom - 18), font, color)
+    else:
+        # Small card (hole cards): single centred label with smaller font
+        font = _font(11, bold=True)
+        lbl = font.render(label, True, color)
+        surf.blit(lbl, lbl.get_rect(center=rect.center))
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +108,9 @@ def _seat_positions(n: int, cx: int, cy: int, rx: int, ry: int) -> list[tuple[in
 def draw_table(surf: pygame.Surface, state: HandState,
                positions: list[tuple[int, int]],
                cx: int, cy: int, rx: int, ry: int,
-               fonts: dict, active_player: int | None):
+               fonts: dict, active_player: int | None,
+               highlight_seat: int | None = None,
+               known_cards: dict | None = None):
     """Draw the oval table, community cards, pot, and player seats."""
 
     # Table oval
@@ -145,15 +156,23 @@ def draw_table(surf: pygame.Surface, state: HandState,
         is_folded  = pidx in state.folded
         is_active  = (pidx == active_player)
 
-        name_color = TEXT_FOLDED if is_folded else (ACTIVE_HL if is_active else TEXT_MAIN)
+        is_tracked = (pidx == highlight_seat)
+        name_color = (TEXT_FOLDED if is_folded
+                      else ACTIVE_HL if is_active
+                      else PLAYER_HL if is_tracked
+                      else TEXT_MAIN)
         box_w, box_h = 110, 66
         box = pygame.Rect(px - box_w // 2, py - box_h // 2, box_w, box_h)
 
-        # Highlight active player
+        # Outer glow / highlight ring
         if is_active:
-            pygame.draw.rect(surf, ACTIVE_HL, box.inflate(6, 6), 2, border_radius=6)
+            pygame.draw.rect(surf, ACTIVE_HL,  box.inflate(8, 8), 2, border_radius=7)
+        elif is_tracked:
+            pygame.draw.rect(surf, PLAYER_HL, box.inflate(8, 8), 3, border_radius=7)
 
-        pygame.draw.rect(surf, PANEL_BG, box, border_radius=6)
+        # Box fill — tinted for tracked player
+        box_bg = PLAYER_HL_BG if is_tracked else PANEL_BG
+        pygame.draw.rect(surf, box_bg, box, border_radius=6)
         pygame.draw.rect(surf, (80, 80, 80), box, 1, border_radius=6)
 
         label = f"p{pidx}"
@@ -168,17 +187,23 @@ def draw_table(surf: pygame.Surface, state: HandState,
             draw_text(surf, f"bet: ${bet:.2f}", (px, py + 8),
                       fonts['small'], ACTIVE_HL, center=True)
 
-        # Hole cards (small, below name)
-        cards = state.hole_cards.get(pidx, [])
-        if cards:
-            for j, card in enumerate(cards[:2]):
-                cx_card = px - 12 + j * 24
-                draw_card(surf, card, cx_card, py + 30, 20, 28)
+        # Hole cards — prefer known_cards (lookahead) over current state
+        actual = (known_cards or {}).get(pidx)
+        state_cards = state.hole_cards.get(pidx, [])
+        # Pick the best available cards to display
+        if actual:
+            display_cards = actual
+        elif state_cards and state_cards[0] != '??':
+            display_cards = state_cards
+        else:
+            display_cards = None
+
+        if display_cards:
+            for j, card in enumerate(display_cards[:2]):
+                draw_card(surf, card, px - 12 + j * 24, py + 30, 20, 28)
         elif not is_folded:
-            # Unknown hole cards placeholder
             for j in range(2):
-                cx_card = px - 12 + j * 24
-                draw_card(surf, '??', cx_card, py + 30, 20, 28)
+                draw_card(surf, '??', px - 12 + j * 24, py + 30, 20, 28)
 
 
 # ---------------------------------------------------------------------------
@@ -259,8 +284,8 @@ class Renderer:
         self.nav_rect = pygame.Rect(0, self.H - nav_h, self.W, nav_h)
         self.log_rect = pygame.Rect(0, self.H - nav_h - log_h, self.W, log_h)
 
-        # Usable area for the table: from a small top margin to just above the log panel
-        TOP_MARGIN = 16
+        # Usable area for the table: from a top margin to just above the log panel
+        TOP_MARGIN = 50  # enough room for the topmost seat box + label
         SEAT_BOX_HALF_H = 33 + 30 + 10  # half seat-box height + hole-cards + clearance
         table_area_top = TOP_MARGIN
         table_area_bot = self.log_rect.top - SEAT_BOX_HALF_H
@@ -284,9 +309,12 @@ class Renderer:
             self.table_rx + 30, self.table_ry + 30,
         )
 
-    def draw(self, state: HandState, step: int, total: int):
+    def draw(self, state: HandState, step: int, total: int,
+             highlight_seat: int | None = None,
+             mouse_pos: tuple | None = None,
+             known_cards: dict | None = None):
         self.screen.fill(BG)
-        mouse = pygame.mouse.get_pos()
+        mouse = mouse_pos if mouse_pos is not None else pygame.mouse.get_pos()
         n = len(state.stacks)
         positions = self.seat_positions(n)
 
@@ -295,10 +323,12 @@ class Renderer:
             self.table_cx, self.table_cy,
             self.table_rx, self.table_ry,
             self.fonts, state.current_actor,
+            highlight_seat=highlight_seat,
+            known_cards=known_cards,
         )
         draw_log_panel(self.screen, state, self.log_rect, self.fonts)
         draw_nav_bar(
             self.screen, self.nav_rect,
             step, total, self.buttons, mouse, self.fonts,
         )
-        pygame.display.flip()
+        # Caller is responsible for pygame.display.flip()

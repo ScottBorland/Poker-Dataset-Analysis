@@ -71,7 +71,9 @@ def run(hands: list[Hand], start_index: int = 0):
             f"{WINDOW_TITLE}  |  Hand {hand_idx+1}/{len(hands)}"
             f"  id={hands[hand_idx].hand_id}  table={hands[hand_idx].table}"
         )
-        renderer.draw(state, session.display_step, session.display_total_steps)
+        renderer.draw(state, session.display_step, session.display_total_steps,
+                      known_cards=session.known_cards)
+        pygame.display.flip()
 
         # Events
         for event in pygame.event.get():

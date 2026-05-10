@@ -200,6 +200,25 @@ def apply_action(state: HandState, action: str) -> HandState:
     return s
 
 
+def _precompute_known_cards(hand: 'Hand') -> dict[int, list[str]]:
+    """Return {seat_1based: [card, card]} for any player whose actual cards are revealed."""
+    known: dict[int, list[str]] = {}
+    for action in hand.actions:
+        parts = action.split()
+        # d dh pN XxYy — revealed deal (skip hidden '????')
+        if (len(parts) == 4 and parts[0] == 'd' and parts[1] == 'dh'
+                and parts[3] != '????'):
+            pidx = int(parts[2][1:])
+            known[pidx] = [parts[3][i:i+2] for i in range(0, len(parts[3]), 2)]
+        # pN sm XxYy — explicit show (skip mucked '????')
+        elif (len(parts) >= 3 and parts[0].startswith('p')
+              and parts[0][1:].isdigit() and parts[1] == 'sm'
+              and parts[2] != '????'):
+            pidx = int(parts[0][1:])
+            known[pidx] = [parts[2][i:i+2] for i in range(0, len(parts[2]), 2)]
+    return known
+
+
 class ReplaySession:
     """
     Manages stepping forward/backward through a hand's actions.
@@ -207,6 +226,7 @@ class ReplaySession:
 
     def __init__(self, hand: 'Hand'):
         self.hand = hand
+        self.known_cards: dict[int, list[str]] = _precompute_known_cards(hand)
         self._states: list[HandState] = [build_initial_state(hand)]
         self._first_step = 0   # temporary; updated below after skipping hidden deals
         # Skip past hidden deals so the first visible frame is meaningful

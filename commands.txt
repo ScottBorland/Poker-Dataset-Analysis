@@ -199,6 +199,50 @@ python src/analyser.py --label squeeze --limit 1
 
 
 ------------------------------------------------------------
+PLAYER REPLAYER  (player-filtered view with stats strip)
+------------------------------------------------------------
+
+# List all player IDs and hand counts in a file
+python src/replayer/player_main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --list-players
+
+# Search player IDs by partial match
+python src/replayer/player_main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --list-players --search "lOK"
+
+# Open the replayer for a specific player (shows only their hands, seat highlighted in teal)
+python src/replayer/player_main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --player lOKkle8LDdJoCkV0V7aIAQ
+
+# Start at a specific hand index within the player's hands
+python src/replayer/player_main.py --file "abs NLH handhq_1-OBFUSCATED.phhs" --player lOKkle8LDdJoCkV0V7aIAQ --index 10
+
+# Keyboard controls:
+#   Right / Space  — next action
+#   Left           — previous action
+#   R              — reset to start of hand
+#   N / P          — next / previous player hand
+#   Q / Escape     — quit
+# Strip buttons:
+#   [◀ Prev Hand]  — previous player hand
+#   [Next Hand ▶]  — next player hand
+
+
+------------------------------------------------------------
+PLAYER ANALYSIS  (in-memory, no database required)
+------------------------------------------------------------
+
+# List players and get aggregate stats
+python -c "
+import sys; sys.path.insert(0, 'src')
+from parser import load_file
+from player_analysis import find_players, player_stats, player_summary_df
+
+hands = load_file('abs NLH handhq_1-OBFUSCATED.phhs')
+print(find_players(hands))                            # all player IDs
+print(player_stats(hands, 'lOKkle8LDdJoCkV0V7aIAQ')) # aggregate stats dict
+print(player_summary_df(hands, 'lOKkle8LDdJoCkV0V7aIAQ').head(10))  # per-hand DataFrame
+"
+
+
+------------------------------------------------------------
 JUPYTER NOTEBOOK
 ------------------------------------------------------------
 

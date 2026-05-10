@@ -9,8 +9,12 @@ __pycache__/
 data/
 phhs files/
 
-# Generated database
+# Generated databases
+db/
 labels/labels.db
+
+# Notebook image exports
+notebooks/nb_images/
 
 # Jupyter
 .ipynb_checkpoints/
