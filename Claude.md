@@ -2,86 +2,18 @@
 
 ## Project Overview
 
-This project analyses a large dataset of No-Limit Texas Hold'em cash game hands from Absolute Poker (2009), stored in `.phhs` files. The goals are:
+This project analyses a large dataset of No-Limit Texas Hold'em cash game hands from two sources:
 
-1. **Parse & explore** the dataset with Python scripts
-2. **Label hands** by situation type (e.g. 3-bet pot, squeeze, single-raised pot)
-3. **Analyse labelled subsets** to study population tendencies, player stats, and equity/range scenarios
-4. **Visualise individual hands** step-by-step using a pygame replayer
+1. **Absolute Poker (2009)** — ~777k hands stored in `.phhs` files across multiple stake levels ($0.50/$1.00, $1/$2, $5/$10 NL). Player IDs are obfuscated base64 strings.
+2. **888poker** — ~118k hands stored in plain-text hand history files. Includes the user's own sessions (player ID `ScottyWotty`) where hole cards are visible at showdown.
 
-There is no "hero" player — this is a population study across all obfuscated players.
+There is no fixed "hero" — the Absolute Poker portion is a population study. The 888poker portion includes ScottyWotty's sessions, enabling starting-hand and positional analysis from a first-person perspective.
 
----
-
-## File Format: `.phhs`
-
-Each file contains multiple hands separated by numbered sections `[1]`, `[2]`, etc. Each hand is a flat key-value block.
-
-### Field Reference
-
-| Field | Type | Description |
-|---|---|---|
-| `variant` | str | Always `'NT'` (No-Limit Texas Hold'em) |
-| `ante_trimming_status` | bool | Ante handling rule |
-| `antes` | list[float] | Ante posted by each player (usually all 0) |
-| `blinds_or_straddles` | list[float] | Blinds per seat — index 0 = SB, index 1 = BB |
-| `min_bet` | float | Minimum bet size |
-| `starting_stacks` | list[float] | Stack sizes at start of hand, per player |
-| `actions` | list[str] | Ordered action sequence (see Action Encoding below) |
-| `venue` | str | Always `'Absolute Poker'` |
-| `time` | str | Time of hand (HH:MM:SS) |
-| `day/month/year` | int | Date of hand |
-| `hand` | int | Unique hand ID |
-| `seats` | list[int] | Physical seat numbers occupied |
-| `table` | str | Table name |
-| `players` | list[str] | Obfuscated player IDs (base64-like strings) |
-| `winnings` | list[float] | Net winnings per player (may be absent if all zero / hand incomplete) |
-| `currency_symbol` | str | Always `'$'` |
-| `time_zone_abbreviation` | str | Always `'ET'` |
-
-**Note:** `winnings` is sometimes absent (e.g. all-in run-outs with unknown cards). Always use `.get('winnings')` defensively.
-
-### Action Encoding
-
-Actions in the `actions` list follow this pattern:
-
-| Prefix | Meaning |
-|---|---|
-| `d dh pN ????` | Deal hole cards to player N (cards hidden/unknown) |
-| `d dh pN XxYy` | Deal hole cards to player N (cards revealed at showdown) |
-| `d db XxYy[Zz]` | Deal board cards (flop = 3 cards, turn/river = 1 card) |
-| `pN f` | Player N folds |
-| `pN cc` | Player N calls or checks |
-| `pN cbr X.XX` | Player N raises/bets to X.XX (total, not raise size) |
-| `pN sm XxYy` | Player N shows mucked cards at showdown |
-
-**Street boundaries** are inferred from `d db` actions:
-- First `d db` = flop (3 cards)
-- Second `d db` = turn (1 card)
-- Third `d db` = river (1 card)
-
-**Player indexing:** Players are 1-indexed (`p1`, `p2`, …). Index maps to `players[N-1]` and `starting_stacks[N-1]`.
-
-**Positions:** p1 = SB, p2 = BB. Button is the last player to act preflop (just before SB).
-
-### Example Hand (annotated)
-
-```
-[6]
-variant = 'NT'
-blinds_or_straddles = [0.25, 0.50, 0, 0, 0, 0]   # 6-handed, SB=0.25 BB=0.50
-starting_stacks = [49.50, 70.69, 12, 18.50, 26.15, 117.05]
-actions = [
-  'd dh p1 ????', ..., 'd dh p6 ????',             # deal
-  'p3 cc', 'p4 cc', 'p5 f', 'p6 f', 'p1 f',        # preflop: limp, limp, folds
-  'p2 cbr 1.50',                                    # BB raises (iso)
-  'p3 cc', 'p4 cc',                                 # two callers
-  'd db 5h2s8h',                                    # flop
-  'p2 cc', 'p3 cc', 'p4 cbr 1.50',                 # p4 bets
-  'p2 f', 'p3 f'                                    # folds
-]
-winnings = [0, 0, 0, 4.55, 0, 0]
-```
+The goals are:
+1. **Parse & ingest** hand histories into a SQLite database
+2. **Auto-label** hands by situation type (pot type, flop texture, hole cards, etc.)
+3. **Analyse** labelled subsets via SQL + pandas
+4. **Replay** individual hands step-by-step in a pygame visualiser
 
 ---
 
@@ -89,39 +21,90 @@ winnings = [0, 0, 0, 4.55, 0, 0]
 
 ```
 Poker Analysis/
-├── Claude.md                  # This file
-├── *.phhs                     # Raw hand history files (not committed to git)
+├── Claude.md                        # This file
+├── data/
+│   ├── phhs files/
+│   │   └── phh-dataset-main/
+│   │       └── data/handhq/
+│   │           └── ABS-*/           # stake-level subdirs, e.g. ABS-2009-..._1000NLH
+│   │               └── *.phhs       # ~780 ingested files, ~1000 hands each
+│   ├── 888poker/                    # 888poker text hand histories (~1056 files)
+│   └── ScottyWotty/                 # ScottyWotty's personal 888poker sessions
 ├── db/
-│   └── poker.db               # Primary SQLite database (not committed to git)
+│   └── poker.db                     # Primary SQLite DB — NOT committed to git
 ├── labels/
-│   └── labels.db              # Manual label store for labeller.py / analyser.py
+│   └── labels.db                    # Manual-label store — NOT committed to git
 ├── src/
-│   ├── ingest.py              # One-time (incremental) ingestion script
-│   ├── parser.py              # .phhs parser → Hand dataclass
-│   ├── hand_utils.py          # Derived features (street detection, pot sizes, positions)
-│   ├── labeller.py            # CLI tool for tagging hands (writes to labels.db)
-│   ├── analyser.py            # Query & aggregate labelled hands (reads labels.db)
-│   ├── scripts.py             # High-level convenience API for notebooks/REPL
+│   ├── parser.py                    # .phhs → Hand dataclass (uses pokerkit)
+│   ├── parser_888.py                # 888poker text → Hand dataclass
+│   ├── hand_utils.py                # Street segmentation, pot reconstruction, positions
+│   ├── ingest.py                    # Populates db/poker.db (incremental)
+│   ├── labeller.py                  # Auto-label engine + CLI for manual labels
+│   ├── analyser.py                  # CLI query tool for labels.db
+│   ├── player_analysis.py           # In-memory per-player stats (no DB required)
+│   ├── scripts.py                   # High-level API for notebooks / REPL
 │   └── replayer/
-│       ├── main.py            # pygame entry point
-│       ├── renderer.py        # Drawing logic
-│       └── state.py           # Hand state machine for step-through replay
-├── commands.txt               # Example CLI commands
+│       ├── main.py                  # pygame entry point (all hands)
+│       ├── player_main.py           # pygame entry point (player-filtered view)
+│       ├── renderer.py              # Drawing logic
+│       └── state.py                 # Hand state machine
 ├── notebooks/
-│   └── exploration.ipynb      # Exploratory analysis
+│   └── exploration.ipynb
+├── commands.txt                     # Example CLI commands
 └── requirements.txt
 ```
 
 ---
 
+## File Formats
+
+### `.phhs` (Absolute Poker)
+
+The `.phhs` format is pokerkit's native TOML-based hand history format. Files contain many hands separated by numbered sections `[1]`, `[2]`, etc.
+
+**Key fields on the `Hand` dataclass** (produced by `parser.py`):
+
+| Field | Type | Notes |
+|---|---|---|
+| `hand_id` | int | Unique hand ID |
+| `players` | list[str] | Obfuscated player IDs (1-indexed: players[0] = p1) |
+| `blinds_or_straddles` | list[float] | Index 0 = SB, index 1 = BB |
+| `starting_stacks` | list[float] | Per player, 0-indexed |
+| `actions` | list[str] | Ordered action sequence (see below) |
+| `winnings` | list[float] \| None | Gross chips received; absent on some all-ins |
+| `day` / `month` / `year` | int | Hand date |
+| `table` | str | Table name |
+| `venue` | str | `'Absolute Poker'` |
+| `n_players` | int (property) | `len(players)` |
+| `date_str` | str (property) | `'YYYY-MM-DD'` |
+
+**Action encoding:**
+
+| Pattern | Meaning |
+|---|---|
+| `d dh pN ????` | Deal hole cards to player N — unknown |
+| `d dh pN XxYy` | Deal hole cards to player N — revealed at showdown |
+| `d db XxYy[Zz]` | Deal board cards (flop = 3 cards, turn/river = 1) |
+| `pN f` | Player N folds |
+| `pN cc` | Player N calls or checks |
+| `pN cbr X.XX` | Player N raises/bets to X.XX (absolute total, not increment) |
+| `pN sm XxYy` | Player N shows/mucks at showdown |
+
+Street boundaries: first `d db` = flop, second = turn, third = river. Players are 1-indexed; p1 = SB, p2 = BB, last player = BTN.
+
+### 888poker text format
+
+Parsed by `parser_888.py` into the same `Hand` dataclass. Hole cards are visible for all players who reached showdown, making it suitable for starting-hand analysis. ScottyWotty's sessions are in `data/ScottyWotty/`.
+
+---
+
 ## Database (`db/poker.db`)
 
-The primary database is `db/poker.db`. It is populated by `src/ingest.py` and is the main source for player-level analysis. Do not commit it to git.
+Populated by `src/ingest.py`. Contains ~893k hands, ~30k unique players, ~4.6M label rows (208 label types) across both venues.
 
 ### Schema
 
 ```sql
--- Tracks which files have been ingested (enables incremental re-runs)
 CREATE TABLE ingested_files (
     filename    TEXT PRIMARY KEY,
     ingested_at TEXT DEFAULT (datetime('now')),
@@ -133,30 +116,31 @@ CREATE TABLE player_hands (
     player_id   TEXT NOT NULL,
     hand_id     INTEGER NOT NULL,
     file        TEXT NOT NULL,
-    seat_idx    INTEGER NOT NULL,   -- 1-indexed
-    n_players   INTEGER NOT NULL,   -- total players seated in this hand
-    position    TEXT,               -- 'BTN' | 'SB' | 'BB' | 'UTG' | 'HJ' | 'CO'
-    stack       REAL,
-    invested    REAL,               -- total chips put into pot (blinds + all bets/calls, uncalled bets returned)
-    winnings    REAL,               -- gross chips received from pot; NULL when absent from source
-    net_won     REAL,               -- winnings - invested; NULL when winnings is NULL
-    saw_flop    INTEGER NOT NULL DEFAULT 0,
-    went_to_sd  INTEGER NOT NULL DEFAULT 0,
-    vpip        INTEGER NOT NULL DEFAULT 0,  -- 1 if player voluntarily put money in preflop
-    pfr         INTEGER NOT NULL DEFAULT 0,  -- 1 if player raised preflop
-    big_blind   REAL,                        -- BB size in $, e.g. 0.50 for $0.25/$0.50
-    date        TEXT,                        -- hand date as 'YYYY-MM-DD'
+    seat_idx    INTEGER NOT NULL,     -- 1-indexed
+    n_players   INTEGER NOT NULL,     -- players at the table
+    position    TEXT,                 -- 'BTN'|'SB'|'BB'|'UTG'|'HJ'|'CO' (NULL for 7+)
+    stack       REAL,                 -- starting stack
+    invested    REAL,                 -- total chips put in (uncalled bets returned)
+    winnings    REAL,                 -- gross chips received; NULL when unknown
+    net_won     REAL,                 -- winnings - invested; NULL when winnings NULL
+    saw_flop    INTEGER DEFAULT 0,
+    went_to_sd  INTEGER DEFAULT 0,
+    vpip        INTEGER DEFAULT 0,    -- 1 if voluntarily put money in preflop
+    pfr         INTEGER DEFAULT 0,    -- 1 if raised preflop
+    venue       TEXT DEFAULT 'absolute_poker',
+    big_blind   REAL,                 -- BB size in $, e.g. 0.50 for $0.25/$0.50
+    date        TEXT,                 -- 'YYYY-MM-DD'
     PRIMARY KEY (player_id, hand_id)
 );
 
--- Auto-labels applied at ingest time (mirrors labels.db schema)
+-- Auto-labels (and manual labels added via labeller.py --add)
 CREATE TABLE labels (
     hand_id     INTEGER NOT NULL,
     file        TEXT NOT NULL,
     label       TEXT NOT NULL,
-    street      TEXT,
-    player_idx  INTEGER,
-    note        TEXT,
+    street      TEXT,                 -- 'preflop'|'flop'|'turn'|'river'|NULL
+    player_idx  INTEGER,              -- 1-indexed seat; NULL = hand-level label
+    note        TEXT,                 -- e.g. raw flop string for flop texture labels
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
@@ -173,7 +157,7 @@ CREATE INDEX idx_label_hand ON labels(hand_id);
 import sqlite3, pandas as pd
 con = sqlite3.connect('db/poker.db')
 
-# Net P&L leaderboard (use net_won, not winnings — winnings is gross chips received)
+# Net P&L leaderboard (net_won = winnings - invested, not raw winnings)
 pd.read_sql("""
     SELECT player_id, COUNT(*) hands, ROUND(SUM(net_won), 2) net_won
     FROM player_hands WHERE net_won IS NOT NULL
@@ -181,15 +165,29 @@ pd.read_sql("""
     ORDER BY net_won DESC
 """, con)
 
-# All hands for a specific player
-pd.read_sql("SELECT * FROM player_hands WHERE player_id = ?", con, params=[player_id])
-
-# Hands where player saw the flop
+# BB-normalised P&L — useful for comparing players across stakes
 pd.read_sql("""
-    SELECT * FROM player_hands WHERE player_id = ? AND saw_flop = 1
-""", con, params=[player_id])
+    SELECT player_id,
+           COUNT(*)                                   hands,
+           ROUND(SUM(net_won / big_blind), 2)         net_won_bb,
+           ROUND(AVG(net_won / big_blind) * 100, 2)   bb_per_100
+    FROM player_hands
+    WHERE net_won IS NOT NULL AND big_blind > 0
+    GROUP BY player_id HAVING hands >= 5
+    ORDER BY net_won_bb DESC
+""", con)
 
-# Player stats in 3bet pots only
+# Positional P&L — always filter n_players for fair comparison
+pd.read_sql("""
+    SELECT position, COUNT(*) hands,
+           ROUND(SUM(net_won), 2) net_won,
+           ROUND(100.0 * SUM(saw_flop) / COUNT(*), 1) flop_seen_pct
+    FROM player_hands
+    WHERE n_players = 6
+    GROUP BY position ORDER BY net_won DESC
+""", con)
+
+# Player stats in 3bet pots
 pd.read_sql("""
     SELECT ph.player_id, COUNT(*) hands, ROUND(SUM(ph.net_won), 2) net_won
     FROM player_hands ph
@@ -198,60 +196,32 @@ pd.read_sql("""
     GROUP BY ph.player_id ORDER BY net_won DESC
 """, con)
 
-# Positional net P&L — filter by n_players to compare like-for-like
-pd.read_sql("""
-    SELECT position, n_players, COUNT(*) hands,
-           ROUND(SUM(net_won), 2) net_won,
-           ROUND(100.0 * SUM(saw_flop) / COUNT(*), 1) flop_seen_pct,
-           ROUND(100.0 * SUM(went_to_sd) / COUNT(*), 1) showdown_pct
-    FROM player_hands
-    WHERE n_players = 6
-    GROUP BY position ORDER BY net_won DESC
-""", con)
-
-# Net P&L in BB units (normalises across stake sizes)
-pd.read_sql("""
-    SELECT player_id,
-           COUNT(*)                                    hands,
-           ROUND(SUM(net_won / big_blind), 2)          net_won_bb,
-           ROUND(AVG(net_won / big_blind) * 100, 2)    bb_per_100
-    FROM player_hands
-    WHERE net_won IS NOT NULL AND big_blind > 0
-    GROUP BY player_id HAVING hands >= 5
-    ORDER BY net_won_bb DESC
-""", con)
-
-# Filter to a specific stake (big_blind = 0.02 → $0.01/$0.02 NL)
-pd.read_sql("SELECT * FROM player_hands WHERE big_blind = 0.50 LIMIT 10", con)
+# Filter to a specific stake
+pd.read_sql("SELECT * FROM player_hands WHERE big_blind = 1.00 LIMIT 20", con)
 
 # Monthly P&L trend
 pd.read_sql("""
-    SELECT strftime('%Y-%m', date)          month,
-           COUNT(DISTINCT hand_id)          hands,
-           ROUND(SUM(net_won), 2)            net_won
-    FROM player_hands
-    WHERE net_won IS NOT NULL
+    SELECT strftime('%Y-%m', date) month,
+           COUNT(DISTINCT hand_id) hands,
+           ROUND(SUM(net_won), 2) net_won
+    FROM player_hands WHERE net_won IS NOT NULL
     GROUP BY month ORDER BY month
 """, con)
 
-# Rake analysis — rake = sum(invested) - sum(winnings) per hand, split proportionally
-# Only valid for hands where all players have known winnings
+# Rake analysis (proportional to chips invested)
 pd.read_sql("""
     WITH hand_rake AS (
         SELECT hand_id,
                SUM(invested)                 total_invested,
                SUM(invested) - SUM(winnings) rake
-        FROM player_hands
-        GROUP BY hand_id
+        FROM player_hands GROUP BY hand_id
         HAVING SUM(CASE WHEN winnings IS NULL THEN 1 ELSE 0 END) = 0
           AND SUM(invested) - SUM(winnings) >= 0
     )
-    SELECT ph.player_id,
-           COUNT(*)                                                    hands,
-           ROUND(SUM(hr.rake * ph.invested / hr.total_invested), 2)   rake_paid,
-           ROUND(SUM(ph.net_won), 2)                                   net_won,
-           ROUND(SUM(ph.net_won)
-               + SUM(hr.rake * ph.invested / hr.total_invested), 2)   net_won_pre_rake
+    SELECT ph.player_id, COUNT(*) hands,
+           ROUND(SUM(hr.rake * ph.invested / hr.total_invested), 2) rake_paid,
+           ROUND(SUM(ph.net_won), 2) net_won,
+           ROUND(SUM(ph.net_won) + SUM(hr.rake * ph.invested / hr.total_invested), 2) net_won_pre_rake
     FROM player_hands ph
     JOIN hand_rake hr ON ph.hand_id = hr.hand_id
     WHERE ph.net_won IS NOT NULL
@@ -262,88 +232,74 @@ pd.read_sql("""
 
 ---
 
-## Ingestion System (`src/ingest.py`)
+## Ingestion (`src/ingest.py`)
 
-`src/ingest.py` parses `.phhs` files and populates `db/poker.db`. It is incremental by design — files already recorded in `ingested_files` are skipped unless a reprocess flag is given.
-
-### Usage
+Incremental by default — files in `ingested_files` are skipped unless forced.
 
 ```bash
-# Ingest all .phhs files in the project root (default)
-python src/ingest.py
-
-# Ingest from a specific directory
-python src/ingest.py --data-dir data/
-
-# Force re-ingest one file (removes its old rows first)
-python src/ingest.py --reprocess "abs NLH handhq_1-OBFUSCATED.phhs"
-
-# Wipe and re-ingest everything from scratch
-python src/ingest.py --reprocess-all
+python src/ingest.py                          # ingest new files from data/
+python src/ingest.py --data-dir data/         # explicit data dir (same as default)
+python src/ingest.py --reprocess file.phhs    # force re-ingest one file
+python src/ingest.py --reprocess-all          # wipe and re-ingest everything
 ```
 
-### What gets written per hand
+**Directory layout expected under `--data-dir`:**
+- `data/phhs files/` — recursively scanned for `*.phhs` (Absolute Poker)
+- `data/888poker/` — scanned for `*.txt` excluding `*Summary*` (888poker)
 
-- One `player_hands` row per seated player, with position, stack, winnings, `saw_flop`, `went_to_sd`
-- All auto-labels from `label_hand()` (same logic as `labeller.py`)
-- One `ingested_files` row recording the filename and hand count
+Per hand, ingest writes:
+- One `player_hands` row per seated player (position, stack, invested, winnings, net_won, saw_flop, went_to_sd, vpip, pfr, big_blind, date)
+- All auto-labels from `label_hand()` into the `labels` table
 
-**Note:** `poker.db` contains auto-labels only. Manual labels added via `labeller.py --add` live in `labels/labels.db` and are never touched by re-ingestion.
+**Note:** `poker.db` holds auto-labels only. Manual labels (`labeller.py --add`) go to `labels/labels.db`.
 
 ---
 
 ## Scripts API (`src/scripts.py`)
-
-High-level convenience functions for interactive use in notebooks or a REPL. All database functions accept an optional `con` keyword — pass an existing connection to avoid repeated open/close in loops; omit it and a fresh connection is opened and closed automatically.
 
 ```python
 import sys; sys.path.insert(0, 'src')
 from scripts import *
 ```
 
-### Data loading
+All DB functions accept an optional `con=` keyword to reuse an open connection.
+
+### Overview & stats
 
 | Function | Returns | Description |
 |---|---|---|
-| `load(path)` | `list[Hand]` | Load all hands from a single `.phhs` file |
-| `load_all(folder='.')` | `list[Hand]` | Load all `.phhs` files in a folder |
-| `connect(db_path)` | `Connection` | Open a connection to `poker.db` (caller closes) |
-
-### Ingestion & labelling
-
-| Function | Description |
-|---|---|
-| `ingest(folder='.', reprocess=None, reprocess_all=False)` | Ingest `.phhs` files into `poker.db` |
-| `add_labels(path_or_folder)` | Run auto-labeller and write to `labels/labels.db` |
-
-### Overview
-
-| Function | Returns | Description |
-|---|---|---|
-| `summary()` | — | Print hands, players, label counts, and rake totals |
-| `label_counts()` | `DataFrame` | Count of each label type |
-| `rake_stats()` | `dict` | Total/avg rake over hands with known winnings |
-| `pot_type_stats(pot_types)` | `DataFrame` | P&L and showdown % by preflop situation |
-| `positional_stats(n_players=6)` | `DataFrame` | P&L by position; pass `None` for all sizes |
+| `summary()` | — | Print hands, players, label counts, rake |
+| `label_counts()` | DataFrame | Count per label type |
+| `rake_stats()` | dict | Total/avg rake |
+| `pot_type_stats(pot_types)` | DataFrame | P&L by preflop pot type |
+| `positional_stats(n_players=6)` | DataFrame | P&L by position; `None` = all sizes |
 
 ### Player analysis
 
 | Function | Returns | Description |
 |---|---|---|
-| `top_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Best players; includes `vpip_pct`, `pfr_pct`; `by` also accepts `'net_won_pre_rake'` |
-| `bottom_players(n=10, by='net_won', min_hands=5)` | `DataFrame` | Biggest losers; includes `vpip_pct`, `pfr_pct` |
-| `vpip_pfr_stats(min_hands=100)` | `DataFrame` | VPIP%, PFR%, and aggression factor for all players with enough hands |
-| `player_stats(player_id)` | `dict` | Overall P&L + `vpip_pct`, `pfr_pct` + breakdown by position and label |
-| `player_hand_history(player_id, label=None)` | `DataFrame` | Every hand for a player, optionally filtered to a label |
+| `top_players(n=10, by='net_won', min_hands=5)` | DataFrame | Includes vpip_pct, pfr_pct; `by` also accepts `'net_won_pre_rake'` |
+| `bottom_players(n=10, by='net_won', min_hands=5)` | DataFrame | Biggest losers |
+| `vpip_pfr_stats(min_hands=100)` | DataFrame | VPIP%, PFR%, AF, net_won |
+| `player_stats(player_id)` | dict | P&L + vpip/pfr + breakdown by position and label |
+| `player_hand_history(player_id, label=None)` | DataFrame | All hands for a player |
 
-### Hand lookup & labels
+### Hand lookup & replay
 
 | Function | Returns | Description |
 |---|---|---|
-| `hand_details(hand_id)` | `dict` | Player rows and label list for one hand |
-| `hands_with_label(label, limit=20)` | `DataFrame` | Player rows for hands carrying a label |
-| `hand_replay(hand, position=None, label=None, player_id='ScottyWotty')` | `dict` | Print stats and open replayer for a specific starting hand (e.g. `'AQs'`, `'KK'`, `'AK'`); optional position/label filters |
-| `label_replay(labels, player_id=None, position=None, n_players=None, max_hands=500, replay=True)` | `dict` | Filter by one or more labels (AND if list), print avg pot in BB + P&L stats, open replayer |
+| `hand_details(hand_id)` | dict | `{'players': DataFrame, 'labels': list}` |
+| `hands_with_label(label, limit=20)` | DataFrame | Player rows for hands with a label |
+| `hand_replay(hand, position=None, label=None, player_id='ScottyWotty')` | dict | Stats + replayer for a specific starting hand (e.g. `'AQs'`, `'KK'`). 888poker only — requires visible hole cards. |
+| `label_replay(labels, player_id=None, position=None, n_players=None, max_hands=500, replay=True)` | dict | Filter by one or more labels (AND logic if list), print avg pot in BB + P&L stats, open replayer. Works on all hands. |
+
+### Data loading
+
+| Function | Returns | Description |
+|---|---|---|
+| `load(path)` | list[Hand] | Load one `.phhs` file |
+| `load_all(folder='.')` | list[Hand] | Load all `.phhs` files in a folder |
+| `connect(db_path)` | Connection | Open poker.db (caller closes) |
 
 ### Example session
 
@@ -351,45 +307,35 @@ from scripts import *
 from scripts import *
 
 summary()
-# Files ingested : 1 | Hands : 1,000 | Players : 151 | Rake : $168.55
 
-top_players(5)
-top_players(5, by='net_won_pre_rake')
-bottom_players(5)
+top_players(10)
+top_players(10, by='net_won_pre_rake')
+bottom_players(10)
+vpip_pfr_stats(min_hands=100)
 
-positional_stats(6)          # 6-max only
-positional_stats(2)          # heads-up only
-positional_stats(None)       # all sizes
+positional_stats(6)       # 6-max
+positional_stats(None)    # all sizes
 
 stats = player_stats('gaItR0R1G3KUo6rFvO7WSA')
-stats['overall']             # dict: hands, net_won, flop_seen_pct, ...
-stats['by_position']         # DataFrame
-stats['by_label']            # DataFrame
+stats['overall']          # dict
+stats['by_position']      # DataFrame
+stats['by_label']         # DataFrame
 
 player_hand_history('gaItR0R1G3KUo6rFvO7WSA', label='3bet_pot')
-
-hand_details(3017235114)     # {'hand_id': ..., 'players': DataFrame, 'labels': [...]}
+hand_details(3017235114)
 hands_with_label('squeeze')
 
-pot_type_stats()
-rake_stats()                 # {'raked_hands': 596, 'total_rake': 168.55, ...}
+# Starting-hand replay (888poker / ScottyWotty hands only)
+hand_replay('AQs')
+hand_replay('AQs', position='BTN')
+hand_replay('KK', label='3bet_pot')
 
-vpip_pfr_stats(min_hands=100)  # VPIP%, PFR%, AF, net_won per player
-# top_players / bottom_players / player_stats all include vpip_pct and pfr_pct
-
-# Starting-hand stats + replayer (888poker hands only, hole cards must be known)
-hand_replay('AQs')                        # all AQs hands — prints stats, opens replayer
-hand_replay('AQ')                         # both AQs and AQo
-hand_replay('AQs', position='BTN')        # filter to BTN only
-hand_replay('KK',  label='3bet_pot')      # KK in 3bet pots
-hand_replay('T9s', label='squeeze', position='CO')
-
-# Label-based replay — filter by any label(s), show stats, open replayer
-label_replay('3bet_pot')                  # all 3bet pots — avg pot in BB + P&L by position
-label_replay(['3bet_pot', 'flop_monotone'])  # AND logic — must carry both labels
-label_replay('squeeze', n_players=6)     # 6-max squeeze pots only
-label_replay('flop_dry', replay=False)   # stats only, no replayer
-label_replay('all_in_preflop', player_id='ScottyWotty')     # specific player stats
+# Label-based replay (all hands)
+label_replay('3bet_pot')                          # P&L by position + avg pot BB
+label_replay(['3bet_pot', 'flop_monotone'])       # AND logic
+label_replay('squeeze', n_players=6)
+label_replay('flop_dry', replay=False)            # stats only
+label_replay('all_in_preflop', player_id='ScottyWotty')
 label_replay('blind_vs_blind', player_id='ScottyWotty', position='SB')
 ```
 
@@ -397,257 +343,118 @@ label_replay('blind_vs_blind', player_id='ScottyWotty', position='SB')
 
 ## Labelling System
 
-### Storage
+Labels live in the `labels` table of `poker.db` (auto, written at ingest) and optionally in `labels/labels.db` (manual, via `labeller.py --add`). The schema is identical in both databases.
 
-Labels from manual review live in `labels/labels.db` (SQLite). Use `src/labeller.py` to populate it and `src/analyser.py` to query it. Auto-labels are also written to `db/poker.db` during ingestion.
-
-### Schema
-
-```sql
-CREATE TABLE labels (
-    hand_id     INTEGER NOT NULL,
-    file        TEXT NOT NULL,
-    label       TEXT NOT NULL,      -- e.g. '3bet_pot', 'squeeze'
-    street      TEXT,               -- 'preflop' | 'flop' | 'turn' | 'river' | NULL
-    player_idx  INTEGER,            -- 1-indexed, NULL if hand-level label
-    note        TEXT,
-    created_at  TEXT DEFAULT (datetime('now'))
-);
-
-CREATE UNIQUE INDEX idx_unique_label ON labels(hand_id, label, COALESCE(player_idx, -1));
-CREATE INDEX idx_label ON labels(label);
-CREATE INDEX idx_hand  ON labels(hand_id);
-```
-
-### Common Queries
-
-```python
-import sqlite3, pandas as pd
-con = sqlite3.connect('labels/labels.db')
-
-# Count of each label type
-pd.read_sql("SELECT label, COUNT(*) cnt FROM labels GROUP BY label ORDER BY cnt DESC", con)
-
-# All hands with a given label
-pd.read_sql("SELECT * FROM labels WHERE label = ?", con, params=['3bet_pot'])
-
-# All labels applied to a specific hand
-pd.read_sql("SELECT label, street FROM labels WHERE hand_id = ?", con, params=[hand_id])
-
-# Hands with both 3bet_pot and squeeze
-pd.read_sql("""
-    SELECT hand_id FROM labels WHERE label = '3bet_pot'
-    INTERSECT
-    SELECT hand_id FROM labels WHERE label = 'squeeze'
-""", con)
-```
+The `label_hand(hand)` function in `labeller.py` returns all applicable `LabelRow` objects for a hand. It is called during ingest and can also be run standalone.
 
 ### Label Taxonomy
 
-**Preflop situation:**
-- `rfi` — raise first in
-- `3bet_pot` — hand includes a 3-bet preflop
-- `4bet_pot` — hand includes a 4-bet preflop (exactly 3 raises)
-- `5bet_pot` — 4 or more raises preflop (also tagged `4bet_pot`)
-- `squeeze` — 3-bet after a raise + one or more callers
-- `limp_pot` — at least one limp, no raise preflop
-- `single_raised_pot` — exactly one raise preflop
-- `blind_vs_blind` — only SB and BB reach the flop in a 3+-handed game
+**Preflop:**
+- `rfi` — raise first in (open raise, no action before)
+- `single_raised_pot` — exactly one preflop raise
+- `3bet_pot` — two preflop raises
+- `4bet_pot` — three preflop raises
+- `5bet_pot` — four or more raises (also tagged `4bet_pot`)
+- `squeeze` — 3-bet after a raise + ≥1 caller
+- `limp_pot` — at least one limp, no raise
+- `blind_vs_blind` — only SB and BB reach flop (in a 3+-handed game)
+- `all_in_preflop` — a player committed all-in before the flop
 
-**Postflop situation:**
+**Postflop:**
 - `heads_up_flop` — exactly 2 players see the flop
 - `3way_flop` — exactly 3 players see the flop
-- `multi_way` — 3+ players see the flop (same condition as `3way_flop` or more)
-- `cbet_flop` — preflop aggressor bets flop (player_idx = aggressor)
-- `donk_bet_flop` — non-aggressor leads the flop (player_idx = bettor)
-- `check_raise_flop` — flop check-raise occurs
-- `check_raise_turn` — turn check-raise occurs
-- `check_raise_river` — river check-raise occurs
+- `multi_way` — 3+ players see the flop
+- `cbet_flop` — preflop aggressor bets flop (`player_idx` = aggressor)
+- `donk_bet_flop` — non-aggressor leads flop (`player_idx` = bettor)
+- `check_raise_flop` / `check_raise_turn` / `check_raise_river`
+- `showdown` — hand reached showdown
 
-**Flop texture** (`street='flop'`, `note` = raw flop string e.g. `'Ah5s2c'`):
-- `flop_rainbow` — three different suits (no flush draw)
-- `flop_two_tone` — two cards share a suit (flush draw possible)
-- `flop_monotone` — all three cards same suit (flush already possible)
-- `flop_paired` — two cards of the same rank on the flop
-- `flop_ace_high` — ace is the highest card
-- `flop_king_high` — king is the highest card (no ace)
-- `flop_low` — all three cards 9 or below (no broadway cards)
-- `flop_two_broadway` — two or more broadway cards (T, J, Q, K, A)
-- `flop_connected` — all three unique ranks within a 5-card window (straight draws likely)
-- `flop_dry` — rainbow + span > 4 + unpaired (no flush draw, no straight draw)
+**Flop texture** (`street='flop'`, raw flop string in `note`, e.g. `'Ah5s2c'`):
+- `flop_rainbow` / `flop_two_tone` / `flop_monotone` — suit texture
+- `flop_paired` — board pair
+- `flop_ace_high` / `flop_king_high` / `flop_low` (all ≤9) — high card
+- `flop_two_broadway` — two or more T–A cards
+- `flop_connected` — all 3 unique ranks within a 5-card window
+- `flop_dry` — rainbow + no straight draw + unpaired
 
-**Hole cards** (`street='preflop'`, `player_idx` = seat, only when cards are revealed):
-- `hand_AA`, `hand_AKs`, `hand_AKo`, etc. — specific canonical hand
-- `pocket_pair` — two cards of the same rank
-- `premium_pair` — pocket pair TT or better
-- `suited` — two non-pair cards of the same suit
-- `offsuit` — two non-pair cards of different suits
-- `suited_connector` — suited + consecutive ranks (e.g. 9h8h)
-- `connector` — consecutive ranks, offsuit (e.g. 9h8s)
-- `suited_one_gapper` — suited + one rank apart (e.g. 9h7h)
-- `one_gapper` — one rank apart, offsuit
-- `broadway` — both cards are broadway (T–A), non-pair
-- `ace_x` — one card is an ace (non-pair)
-- `ace_x_suited` — ace + another card, same suit
-
-**Outcome:**
-- `showdown` — hand goes to showdown
-- `all_in_preflop` — all-in committed before flop
-
-Auto-labels are written to both `labels.db` (via `labeller.py --file` / `--dir`) and `poker.db` (via `ingest.py`). Manual labels can be added to `labels.db` only with `labeller.py --add`.
-
----
-
-## Key Concepts for Implementation
-
-### Pot Size Tracking
-
-The pot is not stored directly — reconstruct it from actions:
-1. Start with sum of blinds/antes
-2. For each `cbr X` action: the raise amount is `X - player_current_bet_this_street`
-3. Track per-player street contributions separately; reset each street
-
-### Position Assignment
-
-Positions are assigned by `assign_positions()` in `hand_utils.py` based on player count:
-
-| Players | Labels assigned |
-|---------|----------------|
-| 2 | BTN, BB |
-| 3 | BTN, SB, BB |
-| 4 | BTN, UTG, SB, BB |
-| 5 | BTN, CO, UTG, SB, BB |
-| 6 | BTN, CO, HJ, UTG, SB, BB |
-| 7+ | p1–pN (no named positions) |
-
-In heads-up, p1 is the BTN (posts SB, acts last postflop). `n_players` is stored in `player_hands` so positional stats can be filtered by game size — always filter `WHERE n_players = 6` when comparing 6-max positions.
-
-### Detecting 3-Bets
-
-```python
-def is_3bet_pot(actions: list[str]) -> bool:
-    preflop_raises = 0
-    for a in actions:
-        if a.startswith('d db'):       # flop dealt — stop
-            break
-        if 'cbr' in a:
-            preflop_raises += 1
-        if preflop_raises >= 2:        # open + 3bet
-            return True
-    return False
-```
-
-### Street Segmentation
-
-```python
-def split_streets(actions):
-    streets = {'preflop': [], 'flop': [], 'turn': [], 'river': []}
-    boards  = {'flop': None, 'turn': None, 'river': None}
-    current, db_count = 'preflop', 0
-    street_order = ['flop', 'turn', 'river']
-    for a in actions:
-        if a.startswith('d db'):
-            current = street_order[db_count]
-            boards[current] = a.split()[-1]   # card string
-            db_count += 1
-        else:
-            streets[current].append(a)
-    return streets, boards
-```
+**Hole cards** (`street='preflop'`, `player_idx` = seat — only when cards are revealed at showdown):
+- `hand_AA`, `hand_AKs`, `hand_AKo`, … — specific canonical hand
+- `pocket_pair`, `premium_pair` (TT+)
+- `suited`, `offsuit`
+- `suited_connector`, `connector`, `suited_one_gapper`, `one_gapper`
+- `broadway` (both cards T–A, non-pair)
+- `ace_x`, `ace_x_suited`
 
 ---
 
 ## Pygame Replayer
 
-### Concept
+Two entry points in `src/replayer/`:
 
-Step-through replay of a single hand, showing:
-- Table layout with seat positions
-- Player stacks and current bet
-- Community cards (revealed as they appear)
-- Action log / history panel
-- Current pot size
-- Navigation: **Next action**, **Prev action**, **Reset**
+- **`main.py`** — loads any list of `Hand` objects; navigate with N/P
+- **`player_main.py`** — player-filtered view, highlights the player's seat in teal, shows only that player's hands
 
-### State Machine
+Both are launched automatically by `label_replay()` and `hand_replay()` in `scripts.py`, or directly from the command line (see `commands.txt`).
 
-Each "frame" in the replayer corresponds to processing one more action from the list. Maintain a `HandState` object:
+Keyboard controls: `Right`/`Space` = next action, `Left` = previous, `R` = reset, `N`/`P` = next/prev hand, `Q`/`Esc` = quit.
+
+---
+
+## Key Implementation Notes
+
+### Position assignment
+
+p1 = SB, p2 = BB, last player = BTN. Named positions only assigned for 2–6 players; 7+ get `p1`–`pN`. Always filter `WHERE n_players = 6` when comparing 6-max positions.
+
+| Players | Positions |
+|---|---|
+| 2 | BTN, BB |
+| 3 | BTN, SB, BB |
+| 4 | BTN, UTG, SB, BB |
+| 5 | BTN, CO, UTG, SB, BB |
+| 6 | BTN, CO, HJ, UTG, SB, BB |
+
+### Pot size
+
+`invested` in `player_hands` = total chips each player put in, with uncalled bets correctly returned. `SUM(invested)` per hand = actual pot (pre-rake). Use this, not `final_pot()` from `hand_utils.py`, which doesn't return uncalled bets.
+
+For BB-normalised pot size: `SUM(invested) / big_blind`.
+
+### Street segmentation
 
 ```python
-@dataclass
-class HandState:
-    step: int
-    stacks: list[float]
-    bets: list[float]          # current street bets per player
-    pot: float
-    board: list[str]           # cards dealt so far
-    hole_cards: dict           # {player_idx: [card1, card2]}
-    folded: set[int]
-    street: str
-    action_log: list[str]      # human-readable history
-    current_actor: int | None
+# from hand_utils.split_streets(hand.actions)
+# returns: streets dict + boards dict
+# boards['flop'] = 'Ah5s2c', boards['turn'] = 'Td', etc.
 ```
 
-Advance state by calling `apply_action(state, action_str) -> HandState`.
+### cbr amounts are absolute
 
-### Layout Sketch
-
-```
-┌─────────────────────────────────┐
-│  [Table oval]                   │
-│     p6         p5               │
-│  p1               p4            │
-│     p2         p3               │
-│                                 │
-│  Board: [Ah][Kd][5s] [Tc] [ ]  │
-│  Pot: $14.50                    │
-├─────────────────────────────────┤
-│  Action log                     │
-│  > p3 raises to $3.50           │
-│  > p1 folds                     │
-│  [← Prev]  Step 7/19  [Next →] │
-└─────────────────────────────────┘
-```
+`p3 cbr 5.00` means player 3's total bet this street is $5.00, not an increment. To get the raise size: `5.00 - player_current_street_bet`.
 
 ---
 
 ## Python Dependencies
 
 ```
-# requirements.txt
-pygame>=2.5
+pokerkit>=0.7    # .phhs parser
+pygame-ce        # replayer (use pygame-ce, not pygame)
 pandas>=2.0
 numpy>=1.25
-sqlite3          # stdlib
-pokerkit>=0.7    # primary parser — .phhs is pokerkit's native format
-treys            # fast hand evaluator (Cactus Kev)
+treys            # hand evaluator
 jupyter
 matplotlib
 ```
-
-**`pokerkit`** is the parsing backend for `src/parser.py`. The `.phhs` format is pokerkit's native TOML-based hand history format. Use `HandHistory.load_all(fh)` (binary file handle) to load all hands from a `.phhs` file — it returns an iterator of `HandHistory` objects.
-
-`HandHistory.from_absolute_poker(s)` is a *different* method that converts raw Absolute Poker casino text logs (not `.phhs`) into `HandHistory` objects. Our dataset is already in `.phhs` format, so `load_all` is the correct entry point.
-
----
-
-## Development Workflow
-
-1. **Parse** — `parser.py` uses `pokerkit.HandHistory.load_all()` to load `.phhs` files into a list of `Hand` dataclasses
-2. **Ingest** — run `ingest.py` to populate `db/poker.db` from all `.phhs` files; auto-labels applied here
-3. **Explore** — use a Jupyter notebook to sanity-check counts, stack distributions, action frequencies
-4. **Label** — add manual labels via `labeller.py`; add new auto-label rules to `ingest.py` and re-run
-5. **Analyse** — query `poker.db` via pandas to study player stats, earnings, labelled subsets
-6. **Replay** — build pygame replayer last, feeding it parsed `Hand` objects
 
 ---
 
 ## Notes & Gotchas
 
-- **Never read `.phhs` files directly** — they are large (thousands of hands each). Always use `load()` / `load_all()` from `scripts.py` or `load_file()` / `load_directory()` from `parser.py`. The folder `phhs files/` may contain the full dataset and must not be grepped, catted, or read line-by-line.
-- **`winnings` can be absent** — some hands (especially all-ins where opponent cards aren't shown) have no `winnings` field. Handle with `.get()`.
-- **Cards use two-char notation** — rank then suit: `Ah` = Ace of hearts, `Tc` = Ten of clubs. Valid suits: `h d c s`.
-- **`????` means unknown cards** — hole cards are only revealed at showdown via `sm` actions. Most hands never reveal cards.
-- **`cbr` amounts are absolute** — the amount is the total bet/raise size facing opponents, not the additional chips going in.
-- **Multi-file dataset** — write the parser to accept a directory glob, not a single file path.
-- **`.gitignore`** — must exclude `data/*.phhs`, `db/poker.db`, `__pycache__`, `*.pyc`, `.env`.
+- **Never read `.phhs` files directly** — they are large. Always use `load_file()` / `load_directory()` from `parser.py`, or `load()` / `load_all()` from `scripts.py`. Do not grep or cat them.
+- **`winnings` can be absent** — all-ins where opponent cards aren't shown have no `winnings` field. Always use `.get('winnings')` and handle `None`.
+- **`big_blind` can be NULL** — abs poker hands ingested before the column was added will have NULL. Re-ingest with `--reprocess-all` to populate.
+- **Hole cards are mostly unknown** — abs poker hands show `????` for hole cards. Cards are only revealed at showdown via `d dh pN XxYy` or `pN sm XxYy`. Hole card labels only apply to showdown hands.
+- **Cards use two-char notation** — `Ah` = Ace of hearts, `Tc` = Ten of clubs. Suits: `h d c s`.
+- **Abs poker files are nested** — files live deep under `data/phhs files/phh-dataset-main/data/handhq/`. The DB stores only the basename. `scripts.py` uses `rglob` to resolve them.
+- **`ingest.py` deduplicates by filename** — the same basename may exist in multiple stake-level subdirectories. Only the first path found by `rglob` is ingested per basename.
+- **`poker.db` and `labels.db` are not committed to git.**
