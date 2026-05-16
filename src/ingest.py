@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS player_hands (
     vpip        INTEGER NOT NULL DEFAULT 0,
     pfr         INTEGER NOT NULL DEFAULT 0,
     venue       TEXT NOT NULL DEFAULT 'absolute_poker',
+    big_blind   REAL,
+    date        TEXT,
     PRIMARY KEY (player_id, hand_id)
 );
 
@@ -79,12 +81,14 @@ def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path))
     conn.executescript(SCHEMA)
     for col, defn in [
-        ("net_won",   "REAL"),
-        ("n_players", "INTEGER NOT NULL DEFAULT 0"),
-        ("invested",  "REAL"),
-        ("vpip",      "INTEGER NOT NULL DEFAULT 0"),
-        ("pfr",       "INTEGER NOT NULL DEFAULT 0"),
-        ("venue",     "TEXT NOT NULL DEFAULT 'absolute_poker'"),
+        ("net_won",    "REAL"),
+        ("n_players",  "INTEGER NOT NULL DEFAULT 0"),
+        ("invested",   "REAL"),
+        ("vpip",       "INTEGER NOT NULL DEFAULT 0"),
+        ("pfr",        "INTEGER NOT NULL DEFAULT 0"),
+        ("venue",      "TEXT NOT NULL DEFAULT 'absolute_poker'"),
+        ("big_blind",  "REAL"),
+        ("date",       "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE player_hands ADD COLUMN {col} {defn}")
@@ -134,6 +138,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path, venue: str = 'absolute_pok
         flop_set = set(players_who_saw_flop(hand))
         investments = compute_investments(hand)
         vpip_pfr = compute_vpip_pfr(hand)
+        bb = hand.blinds_or_straddles[1] if len(hand.blinds_or_straddles) > 1 else None
+        date = hand.date_str if hand.year else None
 
         for seat_idx, player_id in enumerate(hand.players, start=1):
             i = seat_idx - 1
@@ -157,6 +163,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path, venue: str = 'absolute_pok
                 1 if v else 0,
                 1 if p else 0,
                 venue,
+                bb,
+                date,
             ))
 
         for lr in label_hand(hand):
@@ -167,8 +175,8 @@ def ingest_file(conn: sqlite3.Connection, path: Path, venue: str = 'absolute_pok
     conn.executemany(
         "INSERT OR IGNORE INTO player_hands"
         "(player_id, hand_id, file, seat_idx, n_players, position, stack, invested,"
-        " winnings, net_won, saw_flop, went_to_sd, vpip, pfr, venue)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " winnings, net_won, saw_flop, went_to_sd, vpip, pfr, venue, big_blind, date)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         player_rows,
     )
     conn.executemany(
@@ -194,7 +202,14 @@ def _collect_sources(data_dir: Path) -> list[tuple[Path, str]]:
 
     phhs_dir = data_dir / 'phhs files'
     if phhs_dir.is_dir():
-        sources.extend((p, 'absolute_poker') for p in sorted(phhs_dir.glob('*.phhs')))
+        # rglob to handle files nested in subdirectories.
+        # Deduplicate by basename — only the first path per name is ingested,
+        # matching the DB's use of filename (not full path) as the primary key.
+        seen: set[str] = set()
+        for p in sorted(phhs_dir.rglob('*.phhs')):
+            if p.name not in seen:
+                seen.add(p.name)
+                sources.append((p, 'absolute_poker'))
     else:
         sources.extend((p, 'absolute_poker') for p in sorted(data_dir.glob('*.phhs')))
 

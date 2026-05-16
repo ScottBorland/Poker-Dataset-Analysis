@@ -32,6 +32,23 @@ _RANK_IDX = {r: i for i, r in enumerate(_RANKS)}
 _888_hands_cache: list | None = None
 _LABELS_DB = _ROOT / 'labels' / 'labels.db'
 
+# Lazy cache: filename (basename) → list of full Paths on disk
+_phhs_path_map: dict[str, list] | None = None
+
+
+def _get_phhs_path_map() -> dict[str, list]:
+    """Build (or return cached) mapping of .phhs basename → list of full Paths."""
+    global _phhs_path_map
+    if _phhs_path_map is None:
+        from collections import defaultdict
+        m: dict[str, list] = defaultdict(list)
+        phhs_root = _ROOT / 'data' / 'phhs files'
+        if phhs_root.is_dir():
+            for p in phhs_root.rglob('*.phhs'):
+                m[p.name].append(p)
+        _phhs_path_map = dict(m)
+    return _phhs_path_map
+
 
 # ---------------------------------------------------------------------------
 # Internal helper
@@ -430,6 +447,239 @@ def hands_with_label(
     finally:
         if should_close:
             conn.close()
+
+
+def label_replay(
+    labels: str | list[str],
+    player_id: str | None = None,
+    position: str | None = None,
+    n_players: int | None = None,
+    max_hands: int = 500,
+    replay: bool = True,
+    con: sqlite3.Connection | None = None,
+) -> dict:
+    """
+    Filter hands by one or more labels, print stats, and optionally open the replayer.
+
+    If a list of labels is given, a hand must carry ALL of them (AND logic).
+
+    Stats:
+    - Avg pot size in BB (from loaded sample)
+    - If player_id given: that player's net P&L, avg/hand, flop%, showdown%, VPIP/PFR
+    - Otherwise: avg P&L per position across all seated players
+
+    Args:
+        labels:     Label string or list. List = hand must have ALL labels.
+        player_id:  Restrict to hands where this player was seated; stats focus on them.
+        position:   Filter by the position player_id held (requires player_id).
+        n_players:  Filter to a specific table size (e.g. 6 for 6-max).
+        max_hands:  Cap on hands loaded for the replayer (default 500).
+                    Stats always cover the full matching set.
+        replay:     Set False to print stats only, without opening the replayer.
+
+    Examples:
+        label_replay('3bet_pot')
+        label_replay(['3bet_pot', 'flop_monotone'])
+        label_replay('squeeze', n_players=6)
+        label_replay('flop_dry', player_id='ScottyWotty', position='BTN')
+        label_replay('all_in_preflop', replay=False)   # stats only
+    """
+    import sys
+    sys.path.insert(0, str(_SRC))
+    from hand_utils import compute_investments
+
+    if isinstance(labels, str):
+        labels = [labels]
+
+    if position is not None and player_id is None:
+        print("[label_replay] 'position' filter requires 'player_id' — ignoring it.")
+        position = None
+
+    conn, should_close = _con(con)
+    try:
+        # ---- 1. Build matching hand_id set ----
+        # INTERSECT across all labels, then optionally filter by player/n_players
+        intersect_sql = '\nINTERSECT\n'.join(
+            ['SELECT hand_id FROM labels WHERE label = ?'] * len(labels)
+        )
+        ph_conditions: list[str] = []
+        ph_params: list = []
+        if n_players is not None:
+            ph_conditions.append('ph.n_players = ?')
+            ph_params.append(n_players)
+        if player_id is not None:
+            ph_conditions.append('ph.player_id = ?')
+            ph_params.append(player_id)
+        if position is not None:
+            ph_conditions.append('ph.position = ?')
+            ph_params.append(position)
+
+        if ph_conditions:
+            where = 'WHERE ' + ' AND '.join(ph_conditions)
+            id_sql = f"""
+                SELECT DISTINCT lq.hand_id
+                FROM ({intersect_sql}) lq
+                JOIN player_hands ph ON lq.hand_id = ph.hand_id
+                {where}
+            """
+        else:
+            id_sql = intersect_sql
+
+        all_ids = [r[0] for r in conn.execute(id_sql, labels + ph_params).fetchall()]
+        total = len(all_ids)
+
+        if not all_ids:
+            print(f"No hands found matching: {labels}")
+            return {'stats': {}, 'by_position': pd.DataFrame(), 'hands': []}
+
+        # ---- 2. Temp table for all matching IDs (avoids SQLite variable limits) ----
+        conn.execute('CREATE TEMP TABLE IF NOT EXISTS _lr_ids (hand_id INTEGER PRIMARY KEY)')
+        conn.execute('DELETE FROM _lr_ids')
+        conn.executemany('INSERT OR IGNORE INTO _lr_ids VALUES (?)', [(i,) for i in all_ids])
+
+        # ---- 3. DB stats over ALL matching hands ----
+        if player_id:
+            row = conn.execute("""
+                SELECT COUNT(*)                                       hands,
+                       ROUND(SUM(net_won), 2)                         net_won,
+                       ROUND(AVG(net_won), 4)                         avg_per_hand,
+                       ROUND(AVG(net_won) * 100, 2)                   per_100,
+                       ROUND(100.0 * SUM(saw_flop)   / COUNT(*), 1)   flop_pct,
+                       ROUND(100.0 * SUM(went_to_sd) / COUNT(*), 1)   sd_pct,
+                       ROUND(100.0 * SUM(vpip) / COUNT(*), 1)         vpip_pct,
+                       ROUND(100.0 * SUM(pfr)  / COUNT(*), 1)         pfr_pct
+                FROM player_hands ph
+                JOIN _lr_ids hi ON ph.hand_id = hi.hand_id
+                WHERE ph.player_id = ?
+            """, [player_id]).fetchone()
+            db_stats = {
+                'hands': row[0], 'net_won': row[1], 'avg_per_hand': row[2],
+                'per_100': row[3], 'flop_pct': row[4], 'sd_pct': row[5],
+                'vpip_pct': row[6], 'pfr_pct': row[7],
+            }
+            by_position = pd.DataFrame()
+        else:
+            db_stats = {'hands': total}
+            by_position = pd.read_sql("""
+                SELECT ph.position,
+                       COUNT(*)                                          hands,
+                       ROUND(SUM(ph.net_won), 2)                         net_won,
+                       ROUND(AVG(ph.net_won) * 100, 2)                   per_100,
+                       ROUND(100.0 * SUM(ph.saw_flop)   / COUNT(*), 1)   flop_pct,
+                       ROUND(100.0 * SUM(ph.went_to_sd) / COUNT(*), 1)   sd_pct
+                FROM player_hands ph
+                JOIN _lr_ids hi ON ph.hand_id = hi.hand_id
+                WHERE ph.net_won IS NOT NULL
+                GROUP BY ph.position ORDER BY per_100 DESC
+            """, conn)
+
+        # ---- 4. File/venue info for replay subset ----
+        replay_ids = all_ids[:max_hands]
+        conn.execute('CREATE TEMP TABLE IF NOT EXISTS _lr_rpl (hand_id INTEGER PRIMARY KEY)')
+        conn.execute('DELETE FROM _lr_rpl')
+        conn.executemany('INSERT OR IGNORE INTO _lr_rpl VALUES (?)', [(i,) for i in replay_ids])
+
+        file_rows = conn.execute("""
+            SELECT DISTINCT ph.hand_id, ph.file, ph.venue
+            FROM player_hands ph
+            JOIN _lr_rpl ri ON ph.hand_id = ri.hand_id
+        """).fetchall()
+
+    finally:
+        if should_close:
+            conn.close()
+
+    # ---- 5. Load Hand objects from disk ----
+    # Always load — also needed to compute pot-in-BB even when replay=False
+    from collections import defaultdict
+    from parser import load_file
+    from parser_888 import load_file_888
+
+    by_file: dict[tuple[str, str], set[int]] = defaultdict(set)
+    for hand_id, file_, venue in file_rows:
+        by_file[(file_, venue)].add(hand_id)
+
+    phhs_map = _get_phhs_path_map()
+    data_dir = _ROOT / 'data'
+    loaded_hands: list = []
+
+    for (filename, venue), ids in sorted(by_file.items()):
+        if venue == '888poker':
+            path = data_dir / '888poker' / filename
+            if not path.exists():
+                print(f"[label_replay] File not found, skipping: {filename}")
+                continue
+            loaded_hands.extend(h for h in load_file_888(path) if h.hand_id in ids)
+        else:
+            # Abs poker files may be nested — try all paths matching this basename
+            candidates = phhs_map.get(filename, [])
+            if not candidates:
+                print(f"[label_replay] File not found, skipping: {filename}")
+                continue
+            found_ids: set[int] = set()
+            for path in candidates:
+                new_hands = [h for h in load_file(path) if h.hand_id in ids and h.hand_id not in found_ids]
+                loaded_hands.extend(new_hands)
+                found_ids.update(h.hand_id for h in new_hands)
+                if found_ids >= ids:
+                    break   # found all needed hands from this filename
+
+    # ---- 6. Compute avg pot-in-BB from loaded hands ----
+    # Use sum(compute_investments) — correctly returns uncalled bets, unlike final_pot()
+    pot_bbs = []
+    for h in loaded_hands:
+        bb = h.blinds_or_straddles[1] if len(h.blinds_or_straddles) > 1 else 0
+        if bb > 0:
+            pot_bbs.append(sum(compute_investments(h)) / bb)
+    avg_pot_bb = round(sum(pot_bbs) / len(pot_bbs), 1) if pot_bbs else None
+
+    # ---- 7. Print stats ----
+    filter_parts = []
+    if n_players:
+        filter_parts.append(f'{n_players}-max')
+    if position:
+        filter_parts.append(f'@ {position}')
+    filter_str = ('  |  ' + '  |  '.join(filter_parts)) if filter_parts else ''
+
+    print(f"\n{'='*54}")
+    print(f"  Labels : {', '.join(labels)}{filter_str}")
+    print(f"{'='*54}")
+    print(f"  Total matching hands : {total:,}")
+    if total > max_hands:
+        print(f"  Loaded for replayer  : {len(loaded_hands):,}  (first {max_hands:,})")
+    if avg_pot_bb is not None:
+        sample_note = f"  (sample of {len(pot_bbs):,})" if total > max_hands else ''
+        print(f"  Avg pot size         : {avg_pot_bb} BB{sample_note}")
+
+    if player_id:
+        s = db_stats
+        print(f"\n  --- {player_id} ---")
+        n = s.get('hands') or 0
+        if n:
+            nw = s['net_won'] or 0.0
+            p100 = s['per_100'] or 0.0
+            avg = s['avg_per_hand'] or 0.0
+            print(f"  Hands      : {n:,}")
+            print(f"  Net P&L    : ${nw:+.2f}  (${p100:+.2f} / 100 hands)")
+            print(f"  Avg / hand : ${avg:+.4f}")
+            print(f"  Flop seen  : {s['flop_pct']}%   Showdown : {s['sd_pct']}%")
+            print(f"  VPIP / PFR : {s['vpip_pct']}% / {s['pfr_pct']}%")
+        else:
+            print(f"  {player_id} not found in these hands.")
+    else:
+        if not by_position.empty:
+            print(f"\n  P&L by position (population across all seated players):")
+            print(by_position.to_string(index=False))
+    print()
+
+    if not replay or not loaded_hands:
+        return {'stats': db_stats, 'by_position': by_position, 'hands': loaded_hands}
+
+    print(f"Launching replayer with {len(loaded_hands)} hands  (N/P to navigate, Q to quit)...")
+    from replayer.main import run
+    run(loaded_hands)
+
+    return {'stats': db_stats, 'by_position': by_position, 'hands': loaded_hands}
 
 
 # ---------------------------------------------------------------------------

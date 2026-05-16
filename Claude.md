@@ -144,6 +144,8 @@ CREATE TABLE player_hands (
     went_to_sd  INTEGER NOT NULL DEFAULT 0,
     vpip        INTEGER NOT NULL DEFAULT 0,  -- 1 if player voluntarily put money in preflop
     pfr         INTEGER NOT NULL DEFAULT 0,  -- 1 if player raised preflop
+    big_blind   REAL,                        -- BB size in $, e.g. 0.50 for $0.25/$0.50
+    date        TEXT,                        -- hand date as 'YYYY-MM-DD'
     PRIMARY KEY (player_id, hand_id)
 );
 
@@ -205,6 +207,31 @@ pd.read_sql("""
     FROM player_hands
     WHERE n_players = 6
     GROUP BY position ORDER BY net_won DESC
+""", con)
+
+# Net P&L in BB units (normalises across stake sizes)
+pd.read_sql("""
+    SELECT player_id,
+           COUNT(*)                                    hands,
+           ROUND(SUM(net_won / big_blind), 2)          net_won_bb,
+           ROUND(AVG(net_won / big_blind) * 100, 2)    bb_per_100
+    FROM player_hands
+    WHERE net_won IS NOT NULL AND big_blind > 0
+    GROUP BY player_id HAVING hands >= 5
+    ORDER BY net_won_bb DESC
+""", con)
+
+# Filter to a specific stake (big_blind = 0.02 → $0.01/$0.02 NL)
+pd.read_sql("SELECT * FROM player_hands WHERE big_blind = 0.50 LIMIT 10", con)
+
+# Monthly P&L trend
+pd.read_sql("""
+    SELECT strftime('%Y-%m', date)          month,
+           COUNT(DISTINCT hand_id)          hands,
+           ROUND(SUM(net_won), 2)            net_won
+    FROM player_hands
+    WHERE net_won IS NOT NULL
+    GROUP BY month ORDER BY month
 """, con)
 
 # Rake analysis — rake = sum(invested) - sum(winnings) per hand, split proportionally
@@ -315,6 +342,8 @@ from scripts import *
 |---|---|---|
 | `hand_details(hand_id)` | `dict` | Player rows and label list for one hand |
 | `hands_with_label(label, limit=20)` | `DataFrame` | Player rows for hands carrying a label |
+| `hand_replay(hand, position=None, label=None, player_id='ScottyWotty')` | `dict` | Print stats and open replayer for a specific starting hand (e.g. `'AQs'`, `'KK'`, `'AK'`); optional position/label filters |
+| `label_replay(labels, player_id=None, position=None, n_players=None, max_hands=500, replay=True)` | `dict` | Filter by one or more labels (AND if list), print avg pot in BB + P&L stats, open replayer |
 
 ### Example session
 
@@ -347,6 +376,21 @@ rake_stats()                 # {'raked_hands': 596, 'total_rake': 168.55, ...}
 
 vpip_pfr_stats(min_hands=100)  # VPIP%, PFR%, AF, net_won per player
 # top_players / bottom_players / player_stats all include vpip_pct and pfr_pct
+
+# Starting-hand stats + replayer (888poker hands only, hole cards must be known)
+hand_replay('AQs')                        # all AQs hands — prints stats, opens replayer
+hand_replay('AQ')                         # both AQs and AQo
+hand_replay('AQs', position='BTN')        # filter to BTN only
+hand_replay('KK',  label='3bet_pot')      # KK in 3bet pots
+hand_replay('T9s', label='squeeze', position='CO')
+
+# Label-based replay — filter by any label(s), show stats, open replayer
+label_replay('3bet_pot')                  # all 3bet pots — avg pot in BB + P&L by position
+label_replay(['3bet_pot', 'flop_monotone'])  # AND logic — must carry both labels
+label_replay('squeeze', n_players=6)     # 6-max squeeze pots only
+label_replay('flop_dry', replay=False)   # stats only, no replayer
+label_replay('all_in_preflop', player_id='ScottyWotty')     # specific player stats
+label_replay('blind_vs_blind', player_id='ScottyWotty', position='SB')
 ```
 
 ---
@@ -403,15 +447,48 @@ pd.read_sql("""
 **Preflop situation:**
 - `rfi` — raise first in
 - `3bet_pot` — hand includes a 3-bet preflop
-- `4bet_pot` — hand includes a 4-bet preflop
+- `4bet_pot` — hand includes a 4-bet preflop (exactly 3 raises)
+- `5bet_pot` — 4 or more raises preflop (also tagged `4bet_pot`)
 - `squeeze` — 3-bet after a raise + one or more callers
 - `limp_pot` — at least one limp, no raise preflop
 - `single_raised_pot` — exactly one raise preflop
+- `blind_vs_blind` — only SB and BB reach the flop in a 3+-handed game
 
 **Postflop situation:**
-- `cbet_flop` — preflop aggressor bets flop
+- `heads_up_flop` — exactly 2 players see the flop
+- `3way_flop` — exactly 3 players see the flop
+- `multi_way` — 3+ players see the flop (same condition as `3way_flop` or more)
+- `cbet_flop` — preflop aggressor bets flop (player_idx = aggressor)
+- `donk_bet_flop` — non-aggressor leads the flop (player_idx = bettor)
 - `check_raise_flop` — flop check-raise occurs
-- `multi_way` — 3+ players see the flop
+- `check_raise_turn` — turn check-raise occurs
+- `check_raise_river` — river check-raise occurs
+
+**Flop texture** (`street='flop'`, `note` = raw flop string e.g. `'Ah5s2c'`):
+- `flop_rainbow` — three different suits (no flush draw)
+- `flop_two_tone` — two cards share a suit (flush draw possible)
+- `flop_monotone` — all three cards same suit (flush already possible)
+- `flop_paired` — two cards of the same rank on the flop
+- `flop_ace_high` — ace is the highest card
+- `flop_king_high` — king is the highest card (no ace)
+- `flop_low` — all three cards 9 or below (no broadway cards)
+- `flop_two_broadway` — two or more broadway cards (T, J, Q, K, A)
+- `flop_connected` — all three unique ranks within a 5-card window (straight draws likely)
+- `flop_dry` — rainbow + span > 4 + unpaired (no flush draw, no straight draw)
+
+**Hole cards** (`street='preflop'`, `player_idx` = seat, only when cards are revealed):
+- `hand_AA`, `hand_AKs`, `hand_AKo`, etc. — specific canonical hand
+- `pocket_pair` — two cards of the same rank
+- `premium_pair` — pocket pair TT or better
+- `suited` — two non-pair cards of the same suit
+- `offsuit` — two non-pair cards of different suits
+- `suited_connector` — suited + consecutive ranks (e.g. 9h8h)
+- `connector` — consecutive ranks, offsuit (e.g. 9h8s)
+- `suited_one_gapper` — suited + one rank apart (e.g. 9h7h)
+- `one_gapper` — one rank apart, offsuit
+- `broadway` — both cards are broadway (T–A), non-pair
+- `ace_x` — one card is an ace (non-pair)
+- `ace_x_suited` — ace + another card, same suit
 
 **Outcome:**
 - `showdown` — hand goes to showdown
