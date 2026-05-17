@@ -28,6 +28,7 @@ from hand_utils import (
 from labeller import label_hand
 
 DB_PATH = Path(__file__).parent.parent / 'db' / 'poker.db'
+PROGRESS_FILE = Path(__file__).parent.parent / 'db' / 'reprocess_progress.txt'
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS ingested_files (
@@ -69,10 +70,13 @@ CREATE TABLE IF NOT EXISTS labels (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_label
     ON labels(hand_id, label, COALESCE(player_idx, -1));
-CREATE INDEX IF NOT EXISTS idx_player     ON player_hands(player_id);
-CREATE INDEX IF NOT EXISTS idx_ph_hand    ON player_hands(hand_id);
-CREATE INDEX IF NOT EXISTS idx_label      ON labels(label);
-CREATE INDEX IF NOT EXISTS idx_label_hand ON labels(hand_id);
+CREATE INDEX IF NOT EXISTS idx_player      ON player_hands(player_id);
+CREATE INDEX IF NOT EXISTS idx_ph_hand     ON player_hands(hand_id);
+CREATE INDEX IF NOT EXISTS idx_ph_file     ON player_hands(file);
+CREATE INDEX IF NOT EXISTS idx_big_blind   ON player_hands(big_blind);
+CREATE INDEX IF NOT EXISTS idx_label       ON labels(label);
+CREATE INDEX IF NOT EXISTS idx_label_hand  ON labels(hand_id);
+CREATE INDEX IF NOT EXISTS idx_labels_file ON labels(file);
 """
 
 
@@ -234,6 +238,8 @@ def main() -> None:
                     help='Force re-ingest one specific file')
     ap.add_argument('--reprocess-all', action='store_true',
                     help='Remove all existing data and re-ingest every file')
+    ap.add_argument('--reprocess-null-bb', action='store_true',
+                    help='Re-ingest only files that have any row with NULL big_blind')
     ap.add_argument('--db', default=str(DB_PATH),
                     help='SQLite database path (default: db/poker.db)')
     args = ap.parse_args()
@@ -244,6 +250,21 @@ def main() -> None:
     data_dir = Path(args.data_dir)
     sources = _collect_sources(data_dir)
 
+    null_bb_files: set[str] = set()
+    if args.reprocess_null_bb:
+        # Identify 888poker files by venue (avoids a slow full-table scan).
+        # Use a progress file so the run is resumable if interrupted.
+        all_888 = {p.name for p, v in sources if v == '888poker'}
+        done_progress = (
+            set(PROGRESS_FILE.read_text().splitlines())
+            if PROGRESS_FILE.exists() else set()
+        )
+        null_bb_files = all_888 - done_progress
+        print(
+            f'[ingest] --reprocess-null-bb: {len(null_bb_files)} files remaining'
+            f' ({len(done_progress)} already done)'
+        )
+
     if not sources:
         print(f'[ingest] No hand history files found under {data_dir.resolve()}')
         conn.close()
@@ -251,7 +272,11 @@ def main() -> None:
 
     for path, venue in sources:
         filename = path.name
-        force = args.reprocess_all or (filename == args.reprocess)
+        force = (
+            args.reprocess_all
+            or (filename == args.reprocess)
+            or (args.reprocess_null_bb and filename in null_bb_files)
+        )
 
         if force and filename in done:
             print(f'[ingest] Re-processing {filename} (removing old data)...')
@@ -264,7 +289,22 @@ def main() -> None:
         n = ingest_file(conn, path, venue=venue)
         print(f'[ingest] {filename}: {n} hands')
 
+        if args.reprocess_null_bb and filename in null_bb_files:
+            with open(PROGRESS_FILE, 'a') as pf:
+                pf.write(filename + '\n')
+
     conn.close()
+
+    if args.reprocess_null_bb:
+        done_now = (
+            set(PROGRESS_FILE.read_text().splitlines())
+            if PROGRESS_FILE.exists() else set()
+        )
+        all_888 = {p.name for p, v in sources if v == '888poker'}
+        if all_888.issubset(done_now):
+            PROGRESS_FILE.unlink(missing_ok=True)
+            print('[ingest] All 888poker files reprocessed — progress file removed.')
+
     print('[ingest] Done.')
 
 
