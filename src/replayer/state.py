@@ -34,6 +34,14 @@ def fmt_amount(amount: float) -> str:
     return f"${amount:.2f}"
 
 
+def _display_name(names: list[str], pidx: int, max_len: int = 15) -> str:
+    """Return a display-safe name for 1-based player index."""
+    if names and 0 < pidx <= len(names):
+        n = names[pidx - 1]
+        return (n[:max_len - 1] + '…') if len(n) > max_len else n
+    return f'p{pidx}'
+
+
 @dataclass
 class HandState:
     step: int                              # index of next action to apply
@@ -48,6 +56,8 @@ class HandState:
     action_log: list[str]                 # human-readable history
     current_actor: int | None             # 1-based, None if not determined
     hand_over: bool
+    player_names: list[str] = field(default_factory=list)
+    big_blind: float = 0.0
 
     @property
     def total_pot(self) -> float:
@@ -65,6 +75,8 @@ def build_initial_state(hand: 'Hand') -> HandState:
     n = hand.n_players
     stacks = list(hand.starting_stacks)
     street_bets = [0.0] * n
+    player_names = list(hand.players)
+    big_blind = hand.blinds_or_straddles[1] if len(hand.blinds_or_straddles) > 1 else 0.0
 
     # Post blinds / antes
     pot = 0.0
@@ -82,7 +94,7 @@ def build_initial_state(hand: 'Hand') -> HandState:
     for i, blind in enumerate(hand.blinds_or_straddles):
         if i < n and blind > 0:
             pos = 'SB' if i == 0 else 'BB'
-            log.append(f"p{i+1} posts {pos} {fmt_amount(blind)}")
+            log.append(f"{_display_name(player_names, i+1)} posts {pos} {fmt_amount(blind)}")
 
     return HandState(
         step=0,
@@ -97,6 +109,8 @@ def build_initial_state(hand: 'Hand') -> HandState:
         action_log=log,
         current_actor=None,
         hand_over=False,
+        player_names=player_names,
+        big_blind=big_blind,
     )
 
 
@@ -156,10 +170,11 @@ def apply_action(state: HandState, action: str) -> HandState:
         pidx = int(parts[0][1:])   # 1-based
         verb = parts[1]
         s.current_actor = pidx
+        name = _display_name(s.player_names, pidx)
 
         if verb == 'f':
             s.folded.add(pidx)
-            s.action_log.append(f"p{pidx} folds")
+            s.action_log.append(f"{name} folds")
 
             # Check if only one player remains
             active = [i for i in range(1, len(s.stacks)+1) if i not in s.folded]
@@ -173,9 +188,9 @@ def apply_action(state: HandState, action: str) -> HandState:
             s.stacks[pidx - 1] -= additional
             s.street_bets[pidx - 1] += additional
             if additional == 0:
-                s.action_log.append(f"p{pidx} checks")
+                s.action_log.append(f"{name} checks")
             else:
-                s.action_log.append(f"p{pidx} calls {fmt_amount(additional)}")
+                s.action_log.append(f"{name} calls {fmt_amount(additional)}")
 
         elif verb == 'cbr' and len(parts) >= 3:
             total_bet = float(parts[2])
@@ -186,16 +201,16 @@ def apply_action(state: HandState, action: str) -> HandState:
             s.street_bets[pidx - 1] = prev_bet + additional
             facing = max(s.street_bets)
             if prev_bet == 0 and facing == total_bet:
-                s.action_log.append(f"p{pidx} bets {fmt_amount(total_bet)}")
+                s.action_log.append(f"{name} bets {fmt_amount(total_bet)}")
             else:
-                s.action_log.append(f"p{pidx} raises to {fmt_amount(total_bet)}")
+                s.action_log.append(f"{name} raises to {fmt_amount(total_bet)}")
 
         elif verb == 'sm' and len(parts) >= 3:
             cards_str = parts[2]
             cards = [cards_str[i:i+2] for i in range(0, len(cards_str), 2)]
             s.shown_cards[pidx] = cards
             s.hole_cards[pidx] = cards
-            s.action_log.append(f"p{pidx} shows {' '.join(fmt_card(c) for c in cards)}")
+            s.action_log.append(f"{name} shows {' '.join(fmt_card(c) for c in cards)}")
 
     return s
 

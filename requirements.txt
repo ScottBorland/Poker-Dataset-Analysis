@@ -5,3 +5,5 @@ pokerkit
 treys
 jupyter
 matplotlib
+fastapi>=0.115
+uvicorn>=0.32

@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: #030712;
+}
+
+/* React Flow overrides */
+.react-flow__node {
+  font-family: inherit;
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #6366f1;
+  border: 2px solid #030712;
+}
+
+.react-flow__handle:hover {
+  background: #a5b4fc;
+}
+
+.react-flow__edge-path {
+  stroke: #4f46e5;
+  stroke-width: 2;
+}
+
+.react-flow__controls {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+}
+
+.react-flow__controls-button {
+  background: #111827;
+  border-bottom: 1px solid #1f2937;
+  fill: #9ca3af;
+}
+
+.react-flow__controls-button:hover {
+  background: #1f2937;
+}

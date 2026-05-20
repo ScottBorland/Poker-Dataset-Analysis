@@ -962,6 +962,13 @@ def hand_replay(
             GROUP BY ph.position ORDER BY net_won DESC
         """, conn, params=params)
 
+        bb_row = conn.execute(f"""
+            SELECT ROUND(AVG(ph.net_won / ph.big_blind) * 100, 2) per_100_bb
+            {base_query}
+            AND ph.net_won IS NOT NULL AND ph.big_blind > 0
+        """, params).fetchone()
+        per_100_bb = bb_row[0] if bb_row else None
+
         # Hand IDs that pass all filters (for replayer)
         filtered_ids = {
             r[0] for r in conn.execute(
@@ -977,6 +984,7 @@ def hand_replay(
         'hands': overall[0], 'net_won': overall[1], 'per_100': overall[2],
         'flop_pct': overall[3], 'sd_pct': overall[4],
         'vpip_pct': overall[5], 'pfr_pct': overall[6],
+        'per_100_bb': per_100_bb,
     }
 
     filtered_hands = [h for h in matching_hands if h.hand_id in filtered_ids]
@@ -995,6 +1003,8 @@ def hand_replay(
     if overall[0]:
         print(f"  Hands      : {overall[0]}")
         print(f"  Net P&L    : ${overall[1]:+.2f}   (${overall[2]:+.2f}/100)")
+        if per_100_bb is not None:
+            print(f"  Avg BB/100 : {per_100_bb:+.2f} BB/100")
         print(f"  Flop seen  : {overall[3]}%")
         print(f"  Showdown   : {overall[4]}%")
         print(f"  VPIP / PFR : {overall[5]}% / {overall[6]}%")

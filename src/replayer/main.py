@@ -59,6 +59,7 @@ def run(hands: list[Hand], start_index: int = 0):
 
     hand_idx = max(0, min(start_index, len(hands) - 1))
     session  = ReplaySession(hands[hand_idx])
+    show_bb  = False
 
     running = True
     while running:
@@ -72,7 +73,7 @@ def run(hands: list[Hand], start_index: int = 0):
             f"  id={hands[hand_idx].hand_id}  table={hands[hand_idx].table}"
         )
         renderer.draw(state, session.display_step, session.display_total_steps,
-                      known_cards=session.known_cards)
+                      known_cards=session.known_cards, show_bb=show_bb)
         pygame.display.flip()
 
         # Events
@@ -103,6 +104,8 @@ def run(hands: list[Hand], start_index: int = 0):
                     session.rewind()
                 elif renderer.btn_reset.is_clicked(event):
                     session.reset()
+                elif renderer.btn_bb_toggle.is_clicked(event):
+                    show_bb = not show_bb
 
     pygame.quit()
 

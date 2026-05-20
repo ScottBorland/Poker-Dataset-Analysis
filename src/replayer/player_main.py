@@ -176,6 +176,7 @@ def replay_player(
     btn_next = pygame.Rect(WINDOW_W - 10 - _HB_W, _btn_y, _HB_W, _HB_H)
 
     hand_idx = max(0, min(start_index, len(player_hands) - 1))
+    show_bb  = False
 
     def _load(idx: int) -> tuple[ReplaySession, int]:
         h, s = player_hands[idx]
@@ -199,6 +200,7 @@ def replay_player(
             highlight_seat=seat,
             mouse_pos=table_mouse,
             known_cards=session.known_cards,
+            show_bb=show_bb,
         )
 
         # Draw player strip on top of the screen
@@ -247,6 +249,8 @@ def replay_player(
                     session.rewind()
                 elif renderer.btn_reset.rect.collidepoint(table_mouse):
                     session.reset()
+                elif renderer.btn_bb_toggle.rect.collidepoint(table_mouse):
+                    show_bb = not show_bb
 
     pygame.quit()
 

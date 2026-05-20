@@ -45,6 +45,19 @@ def _font(size: int, bold: bool = False) -> pygame.font.Font:
     return pygame.font.SysFont('consolas', size, bold=bold)
 
 
+def _fmt_amount(amount: float, big_blind: float, show_bb: bool) -> str:
+    if show_bb and big_blind > 0:
+        return f"{amount / big_blind:.1f}BB"
+    return f"${amount:.2f}"
+
+
+def _seat_label(player_names: list[str], pidx: int, max_len: int = 12) -> str:
+    if player_names and 0 < pidx <= len(player_names):
+        n = player_names[pidx - 1]
+        return (n[:max_len - 1] + '…') if len(n) > max_len else n
+    return f'p{pidx}'
+
+
 def draw_text(surf: pygame.Surface, text: str, pos: tuple, font: pygame.font.Font,
               color=TEXT_MAIN, center: bool = False):
     rendered = font.render(text, True, color)
@@ -110,7 +123,8 @@ def draw_table(surf: pygame.Surface, state: HandState,
                cx: int, cy: int, rx: int, ry: int,
                fonts: dict, active_player: int | None,
                highlight_seat: int | None = None,
-               known_cards: dict | None = None):
+               known_cards: dict | None = None,
+               show_bb: bool = False):
     """Draw the oval table, community cards, pot, and player seats."""
 
     # Table oval
@@ -135,7 +149,9 @@ def draw_table(surf: pygame.Surface, state: HandState,
             pygame.draw.rect(surf, (50, 90, 50), ph, 1, border_radius=4)
 
     # Pot
-    pot_text = f"Pot: {state.display_pot()}"
+    bb = state.big_blind
+    pot_val = f"{state.total_pot / bb:.1f}BB" if (show_bb and bb > 0) else state.display_pot()
+    pot_text = f"Pot: {pot_val}"
     draw_text(surf, pot_text, (cx, cy + 38), fonts['medium'], TEXT_MAIN, center=True)
 
     # Last action banner — always shows what just happened
@@ -175,16 +191,16 @@ def draw_table(surf: pygame.Surface, state: HandState,
         pygame.draw.rect(surf, box_bg, box, border_radius=6)
         pygame.draw.rect(surf, (80, 80, 80), box, 1, border_radius=6)
 
-        label = f"p{pidx}"
+        label = _seat_label(state.player_names, pidx)
         draw_text(surf, label, (px, py - 24), fonts['small'], name_color, center=True)
 
-        stack_str = f"${state.stacks[i]:.2f}"
+        stack_str = _fmt_amount(state.stacks[i], bb, show_bb)
         draw_text(surf, stack_str, (px, py - 8), fonts['small'],
                   TEXT_FOLDED if is_folded else TEXT_DIM, center=True)
 
         bet = state.street_bets[i] if i < len(state.street_bets) else 0.0
         if bet > 0:
-            draw_text(surf, f"bet: ${bet:.2f}", (px, py + 8),
+            draw_text(surf, f"bet: {_fmt_amount(bet, bb, show_bb)}", (px, py + 8),
                       fonts['small'], ACTIVE_HL, center=True)
 
         # Hole cards — prefer known_cards (lookahead) over current state
@@ -298,10 +314,11 @@ class Renderer:
 
         bw, bh = 110, 32
         by = self.nav_rect.centery - bh // 2
-        self.btn_prev  = Button("← Prev",  pygame.Rect(20,           by, bw, bh))
-        self.btn_next  = Button("Next →",  pygame.Rect(self.W - 130, by, bw, bh))
-        self.btn_reset = Button("Reset",   pygame.Rect(self.W // 2 + 90, by, 80, bh))
-        self.buttons   = [self.btn_prev, self.btn_next, self.btn_reset]
+        self.btn_prev      = Button("← Prev",  pygame.Rect(20,                    by, bw,  bh))
+        self.btn_next      = Button("Next →",  pygame.Rect(self.W - 130,          by, bw,  bh))
+        self.btn_reset     = Button("Reset",   pygame.Rect(self.W // 2 + 90,      by, 80,  bh))
+        self.btn_bb_toggle = Button("Show BB", pygame.Rect(self.W // 2 - 170,     by, 100, bh))
+        self.buttons = [self.btn_prev, self.btn_next, self.btn_reset, self.btn_bb_toggle]
 
     def seat_positions(self, n: int) -> list[tuple[int, int]]:
         return _seat_positions(
@@ -312,8 +329,10 @@ class Renderer:
     def draw(self, state: HandState, step: int, total: int,
              highlight_seat: int | None = None,
              mouse_pos: tuple | None = None,
-             known_cards: dict | None = None):
+             known_cards: dict | None = None,
+             show_bb: bool = False):
         self.screen.fill(BG)
+        self.btn_bb_toggle.label = "Show $" if show_bb else "Show BB"
         mouse = mouse_pos if mouse_pos is not None else pygame.mouse.get_pos()
         n = len(state.stacks)
         positions = self.seat_positions(n)
@@ -325,6 +344,7 @@ class Renderer:
             self.fonts, state.current_actor,
             highlight_seat=highlight_seat,
             known_cards=known_cards,
+            show_bb=show_bb,
         )
         draw_log_panel(self.screen, state, self.log_rect, self.fonts)
         draw_nav_bar(
