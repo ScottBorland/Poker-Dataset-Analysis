@@ -1,27 +1,32 @@
 import { Handle, Position, NodeProps } from '@xyflow/react'
-import { StatsNodeData, PositionStat } from '../types'
+import { useEffect, useRef, useState } from 'react'
+import { StatsNodeData } from '../types'
 import { useFlow } from '../context/FlowContext'
 
-const POS_ORDER = ['BTN', 'CO', 'HJ', 'UTG', 'SB', 'BB']
-
 function fmtBB(n: number): string {
-  return `${n >= 0 ? '+' : ''}${n}`
-}
-
-function sortPositions(rows: PositionStat[]): PositionStat[] {
-  return [...rows].sort((a, b) => {
-    const ai = POS_ORDER.indexOf(a.position)
-    const bi = POS_ORDER.indexOf(b.position)
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-  })
+  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}`
 }
 
 export function StatsNode({ id, data }: NodeProps) {
-  const { stats, loading, error } = data as unknown as StatsNodeData
+  const { stats, loading, error, hasHoleCards } = data as unknown as StatsNodeData
   const { deleteNode } = useFlow()
+  const [elapsed, setElapsed] = useState(0)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (loading) {
+      setElapsed(0)
+      timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [loading])
+
+  const scottyLabel = hasHoleCards ? '🃏 With these cards' : '👤 ScottyWotty'
 
   return (
-    <div className="bg-gray-900 border border-emerald-600 rounded-lg shadow-xl text-white text-xs w-80">
+    <div className="bg-gray-900 border border-emerald-600 rounded-lg shadow-xl text-white text-xs w-72">
       <Handle type="target" position={Position.Left} />
 
       <div className="px-3 py-1.5 border-b border-emerald-700 font-semibold text-xs uppercase tracking-wider text-emerald-400 flex items-center justify-between">
@@ -36,7 +41,10 @@ export function StatsNode({ id, data }: NodeProps) {
       </div>
 
       {loading && (
-        <div className="px-3 py-6 text-center text-gray-400 animate-pulse">Running query…</div>
+        <div className="px-3 py-6 text-center text-gray-400">
+          <div className="animate-pulse mb-1">Running query…</div>
+          <div className="text-gray-600 text-xs tabular-nums">{elapsed}s — DB cache may be cold</div>
+        </div>
       )}
 
       {error && (
@@ -59,63 +67,41 @@ export function StatsNode({ id, data }: NodeProps) {
             <div className="px-3 py-2 flex gap-4 text-gray-200">
               <span><span className="text-white font-bold">{stats.total_hands.toLocaleString()}</span> hands</span>
               <span><span className="text-white font-bold">{stats.showdown_pct}%</span> SD</span>
-              <span><span className="text-white font-bold">{stats.avg_pot_bb}</span> BB avg pot</span>
+              <span><span className="text-white font-bold">{stats.avg_pot_bb}</span> BB pot</span>
             </div>
           )}
 
-          {/* ScottyWotty */}
-          {stats.scotty_hands !== undefined && (
+          {/* Card holder / ScottyWotty stats */}
+          {stats.scotty_hands != null && (
             <div className="px-3 py-2">
-              <div className="text-rose-400 font-medium mb-1">👤 ScottyWotty</div>
+              <div className="text-rose-400 font-medium mb-1">{scottyLabel}</div>
               {stats.scotty_hands === 0 ? (
                 <div className="text-gray-600">Not in these hands</div>
               ) : (
-                <div className="flex flex-wrap gap-3 text-gray-200">
-                  <span>
-                    <span className="text-white font-bold">{stats.scotty_hands.toLocaleString()}</span> hands
-                  </span>
-                  {stats.scotty_won_pct != null && (
+                <div className="space-y-0.5 text-gray-200">
+                  <div className="flex gap-3">
                     <span>
-                      <span className="text-white font-bold">{stats.scotty_won_pct}%</span> won
+                      <span className="text-white font-bold">{stats.scotty_hands.toLocaleString()}</span> hands
                     </span>
-                  )}
-                  {stats.scotty_bb_per_100 != null && (
-                    <span>
-                      <span className={`font-bold font-mono ${stats.scotty_bb_per_100 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {stats.scotty_bb_per_100 >= 0 ? '+' : ''}{stats.scotty_bb_per_100}
+                    {stats.scotty_won_pct != null && (
+                      <span>
+                        <span className="text-white font-bold">{stats.scotty_won_pct}%</span> won
                       </span>
-                      {' BB/100'}
-                    </span>
+                    )}
+                  </div>
+                  {stats.scotty_bb_per_100 != null && (
+                    <div>
+                      <span className={`font-bold font-mono ${stats.scotty_bb_per_100 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {fmtBB(stats.scotty_bb_per_100 / 100)}
+                      </span>
+                      <span className="text-gray-500"> BB avg per hand</span>
+                      <span className="text-gray-600 ml-2">
+                        ({stats.scotty_bb_per_100 >= 0 ? '+' : ''}{stats.scotty_bb_per_100} BB/100)
+                      </span>
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* BB/100 by position */}
-          {stats.by_position.length > 0 && (
-            <div className="px-3 py-2">
-              <div className="text-gray-500 mb-1 font-medium">BB/100 by position</div>
-              <table className="w-full">
-                <thead>
-                  <tr className="text-gray-500">
-                    <th className="text-left font-normal">Pos</th>
-                    <th className="text-right font-normal">Hands</th>
-                    <th className="text-right font-normal">BB/100</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortPositions(stats.by_position).map(row => (
-                    <tr key={row.position} className="border-t border-gray-800">
-                      <td className="text-gray-300 py-0.5">{row.position}</td>
-                      <td className="text-right text-gray-400">{row.hands.toLocaleString()}</td>
-                      <td className={`text-right font-mono ${row.bb_per_100 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {fmtBB(row.bb_per_100)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 import { ApiFilter, StatsData } from '../types'
 
-const BASE = 'http://localhost:8000'
+const BASE = ''
 
 export async function runQueryApi(filters: ApiFilter[]): Promise<StatsData> {
   const res = await fetch(`${BASE}/query`, {

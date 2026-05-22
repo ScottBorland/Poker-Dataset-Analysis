@@ -3,9 +3,8 @@ import { FilterNodeWrapper } from './FilterNodeWrapper'
 import { useFlow } from '../context/FlowContext'
 
 const OPTIONS = [
-  { value: 'any', label: 'Any' },
-  { value: 'rfi', label: 'RFI (raise first in)' },
-  { value: 'single_raised_pot', label: 'Single raised pot' },
+  { value: 'rfi', label: 'RFI' },
+  { value: 'single_raised_pot', label: 'Single raised' },
   { value: '3bet_pot', label: '3-bet pot' },
   { value: '4bet_pot', label: '4-bet pot' },
   { value: '5bet_pot', label: '5-bet pot' },
@@ -17,19 +16,36 @@ const OPTIONS = [
 
 export function PreflopActionNode({ id, data }: NodeProps) {
   const { updateNodeValue } = useFlow()
-  const value = (data.value as string) ?? 'any'
+  const selected: string[] = Array.isArray(data.value) ? (data.value as string[]) : []
+
+  function toggle(val: string) {
+    const next = selected.includes(val)
+      ? selected.filter(v => v !== val)
+      : [...selected, val]
+    updateNodeValue(id, next)
+  }
 
   return (
     <FilterNodeWrapper id={id} title="♠ Preflop Action" accent="border-blue-500">
-      <select
-        value={value}
-        onChange={e => updateNodeValue(id, e.target.value)}
-        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-blue-400"
-      >
+      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
         {OPTIONS.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+          <label key={o.value} className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={selected.includes(o.value)}
+              onChange={() => toggle(o.value)}
+              className="accent-blue-500 shrink-0"
+            />
+            <span className="text-gray-300 text-xs">{o.label}</span>
+          </label>
         ))}
-      </select>
+      </div>
+      {selected.length === 0 && (
+        <div className="text-gray-600 text-xs">No filter (select one or more).</div>
+      )}
+      {selected.length > 1 && (
+        <div className="text-blue-700 text-xs">{selected.length} selected — OR logic.</div>
+      )}
     </FilterNodeWrapper>
   )
 }

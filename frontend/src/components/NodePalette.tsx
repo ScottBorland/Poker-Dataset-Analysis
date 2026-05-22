@@ -8,6 +8,7 @@ interface PaletteItem {
 }
 
 const ITEMS: PaletteItem[] = [
+  { type: 'venue', label: 'Venue', icon: '🏛', accent: 'border-indigo-500 text-indigo-400' },
   { type: 'numPlayers', label: 'Players', icon: '👥', accent: 'border-orange-500 text-orange-400' },
   { type: 'holeCards', label: 'Hole Cards', icon: '🃏', accent: 'border-purple-500 text-purple-400' },
   { type: 'showdown', label: 'Showdown', icon: '🎯', accent: 'border-teal-500 text-teal-400' },

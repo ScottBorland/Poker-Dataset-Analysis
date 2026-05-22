@@ -28,8 +28,8 @@ export function getFilterChain(nodeId: string, nodes: Node[], edges: Edge[]): Ap
     if (f.value === 'any' || f.value === null || f.value === undefined || f.value === '') return false
     if (Array.isArray(f.value) && f.value.length === 0) return false
     if (f.type === 'player_position') {
-      const v = f.value as Record<string, string> | null
-      if (!v || !v.position || v.position === 'any') return false
+      const v = f.value as { player_id?: string; positions?: string[] } | null
+      if (!v || !v.positions || v.positions.length === 0) return false
     }
     return true
   })

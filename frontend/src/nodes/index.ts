@@ -5,6 +5,7 @@ import { FlopTypeNode } from './FlopTypeNode'
 import { PreflopActionNode } from './PreflopActionNode'
 import { PlayerNode } from './PlayerNode'
 import { PlayerPositionNode } from './PlayerPositionNode'
+import { VenueNode } from './VenueNode'
 import { StatsNode } from './StatsNode'
 
 export const nodeTypes = {
@@ -15,5 +16,6 @@ export const nodeTypes = {
   preflopAction: PreflopActionNode,
   playerName: PlayerNode,
   playerPosition: PlayerPositionNode,
+  venue: VenueNode,
   stats: StatsNode,
 }

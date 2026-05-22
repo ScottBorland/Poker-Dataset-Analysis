@@ -31,9 +31,10 @@ const DEFAULT_VALUES: Record<string, unknown> = {
   holeCards: [],
   showdown: 'any',
   flopType: [],
-  preflopAction: 'any',
+  preflopAction: [],
   playerName: 'ScottyWotty',
-  playerPosition: { player_id: 'ScottyWotty', position: 'any' },
+  playerPosition: { player_id: '', positions: [] },
+  venue: 'any',
 }
 
 const API_TYPES: Record<string, string> = {
@@ -44,6 +45,7 @@ const API_TYPES: Record<string, string> = {
   preflopAction: 'preflop_action',
   playerName: 'player',
   playerPosition: 'player_position',
+  venue: 'venue',
 }
 
 export default function App() {
@@ -74,6 +76,10 @@ export default function App() {
     const currentEdges = edgesRef.current
     const filters = getFilterChain(nodeId, currentNodes, currentEdges)
 
+    const hasHoleCards = filters.some(
+      f => f.type === 'hole_cards' && Array.isArray(f.value) && (f.value as string[]).length > 0
+    )
+
     const clickedNode = currentNodes.find(n => n.id === nodeId)
     if (!clickedNode) return
 
@@ -88,7 +94,7 @@ export default function App() {
       statsId = nextNode.id
       setNodes(nds => nds.map(n =>
         n.id === statsId
-          ? { ...n, data: { stats: null, loading: true, error: null } satisfies StatsNodeData }
+          ? { ...n, data: { stats: null, loading: true, error: null, hasHoleCards } satisfies StatsNodeData }
           : n
       ))
     } else {
@@ -102,7 +108,7 @@ export default function App() {
         id: statsId,
         type: 'stats',
         position: statsPos,
-        data: { stats: null, loading: true, error: null } satisfies StatsNodeData,
+        data: { stats: null, loading: true, error: null, hasHoleCards } satisfies StatsNodeData,
       }
 
       if (outEdge) {
@@ -123,13 +129,13 @@ export default function App() {
       const result = await runQueryApi(filters)
       setNodes(nds => nds.map(n =>
         n.id === statsId
-          ? { ...n, data: { stats: result, loading: false, error: null } satisfies StatsNodeData }
+          ? { ...n, data: { stats: result, loading: false, error: null, hasHoleCards } satisfies StatsNodeData }
           : n
       ))
     } catch (err) {
       setNodes(nds => nds.map(n =>
         n.id === statsId
-          ? { ...n, data: { stats: null, loading: false, error: String(err) } satisfies StatsNodeData }
+          ? { ...n, data: { stats: null, loading: false, error: String(err), hasHoleCards } satisfies StatsNodeData }
           : n
       ))
     }

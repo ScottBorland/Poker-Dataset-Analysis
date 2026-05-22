@@ -104,11 +104,17 @@ def build_filter_sql(filters: list[Filter]) -> tuple[str, list[Any]]:
                     )
                     params.append(v)
 
-        elif f.type == 'preflop_action' and f.value not in (None, 'any'):
-            include_subqueries.append(
-                "SELECT DISTINCT hand_id FROM labels WHERE label = ?"
+        elif f.type == 'preflop_action':
+            values = f.value if isinstance(f.value, list) else (
+                [f.value] if f.value not in (None, 'any') else []
             )
-            params.append(f.value)
+            values = [v for v in values if v and v != 'any']
+            if values:
+                placeholders = ','.join('?' * len(values))
+                include_subqueries.append(
+                    f"SELECT DISTINCT hand_id FROM labels WHERE label IN ({placeholders})"
+                )
+                params.extend(values)
 
         elif f.type == 'player' and f.value and str(f.value).strip():
             include_subqueries.append(
@@ -117,19 +123,30 @@ def build_filter_sql(filters: list[Filter]) -> tuple[str, list[Any]]:
             params.append(str(f.value).strip())
 
         elif f.type == 'player_position' and isinstance(f.value, dict):
-            pos = f.value.get('position', 'any')
+            raw_positions = f.value.get('positions') or []
+            if not raw_positions:
+                single = f.value.get('position', 'any')
+                raw_positions = [single] if single and single != 'any' else []
+            positions = [p for p in raw_positions if p and p != 'any']
             player_id = (f.value.get('player_id') or '').strip()
-            if pos and pos != 'any':
+            if positions:
+                placeholders = ','.join('?' * len(positions))
                 if player_id:
                     include_subqueries.append(
-                        "SELECT DISTINCT hand_id FROM player_hands WHERE player_id = ? AND position = ?"
+                        f"SELECT DISTINCT hand_id FROM player_hands WHERE player_id = ? AND position IN ({placeholders})"
                     )
-                    params.extend([player_id, pos])
+                    params.extend([player_id, *positions])
                 else:
                     include_subqueries.append(
-                        "SELECT DISTINCT hand_id FROM player_hands WHERE position = ?"
+                        f"SELECT DISTINCT hand_id FROM player_hands WHERE position IN ({placeholders})"
                     )
-                    params.append(pos)
+                    params.extend(positions)
+
+        elif f.type == 'venue' and f.value not in (None, 'any'):
+            include_subqueries.append(
+                "SELECT DISTINCT hand_id FROM player_hands WHERE venue = ?"
+            )
+            params.append(f.value)
 
     if not include_subqueries and not exclude_subqueries:
         return "SELECT DISTINCT hand_id FROM player_hands LIMIT 500000", []
@@ -144,14 +161,16 @@ def build_filter_sql(filters: list[Filter]) -> tuple[str, list[Any]]:
 @app.post("/query")
 def run_query(req: QueryRequest) -> dict:
     filter_sql, params = build_filter_sql(req.filters)
+    show_scotty = not any(
+        f.type == 'venue' and f.value not in (None, 'any', '888poker')
+        for f in req.filters
+    )
 
     if "LIMIT 500000" in filter_sql:
         return {
             'total_hands': -1,
             'showdown_pct': 0.0,
             'avg_pot_bb': 0.0,
-            'by_position': [],
-            'top_players': [],
             'message': 'Set at least one filter before running a query.',
         }
 
@@ -167,8 +186,8 @@ def run_query(req: QueryRequest) -> dict:
 
         if total_hands == 0:
             return {'total_hands': 0, 'showdown_pct': 0.0, 'avg_pot_bb': 0.0,
-                    'by_position': [], 'top_players': [],
-                    'scotty_hands': 0, 'scotty_won_pct': None, 'scotty_bb_per_100': None}
+                    'scotty_hands': 0 if show_scotty else None,
+                    'scotty_won_pct': None, 'scotty_bb_per_100': None}
 
         # Too many hands — skip expensive stats
         if total_hands > 1_000_000:
@@ -176,8 +195,6 @@ def run_query(req: QueryRequest) -> dict:
                 'total_hands': total_hands,
                 'showdown_pct': 0.0,
                 'avg_pot_bb': 0.0,
-                'by_position': [],
-                'top_players': [],
                 'scotty_hands': None,
                 'scotty_won_pct': None,
                 'scotty_bb_per_100': None,
@@ -202,43 +219,31 @@ def run_query(req: QueryRequest) -> dict:
         """).fetchone()[0]
         avg_pot_bb = round(float(avg_pot_val), 1) if avg_pot_val else 0.0
 
-        # BB/100 by position — SQL GROUP BY, no Python loop
-        pos_rows = con.execute("""
-            SELECT ph.position,
-                   COUNT(*) AS hands,
-                   ROUND(SUM(ph.net_won / ph.big_blind) / COUNT(*) * 100, 2) AS bb_per_100
-            FROM _vh JOIN player_hands ph ON ph.hand_id = _vh.hand_id
-            WHERE ph.net_won IS NOT NULL AND ph.big_blind > 0 AND ph.position IS NOT NULL
-            GROUP BY ph.position
-        """).fetchall()
-
-        by_position = [
-            {'position': r['position'], 'hands': r['hands'], 'bb_per_100': r['bb_per_100']}
-            for r in pos_rows
-        ]
-
-        # ScottyWotty aggregate
-        scotty_row = con.execute("""
-            SELECT COUNT(*) AS hands,
-                   COUNT(CASE WHEN ph.net_won > 0 THEN 1 END) AS wins,
-                   AVG(ph.net_won / ph.big_blind) AS avg_net_bb
-            FROM _vh JOIN player_hands ph ON ph.hand_id = _vh.hand_id
-            WHERE ph.player_id = 'ScottyWotty'
-              AND ph.net_won IS NOT NULL AND ph.big_blind > 0
-        """).fetchone()
-        s_hands = scotty_row['hands']
-        s_won_pct = round(100.0 * scotty_row['wins'] / s_hands, 1) if s_hands else None
-        s_bb100 = (
-            round(float(scotty_row['avg_net_bb']) * 100, 1)
-            if scotty_row['avg_net_bb'] is not None else None
-        )
+        # ScottyWotty aggregate — only when venue includes 888poker
+        if show_scotty:
+            scotty_row = con.execute("""
+                SELECT COUNT(*) AS hands,
+                       COUNT(CASE WHEN ph.net_won > 0 THEN 1 END) AS wins,
+                       AVG(ph.net_won / ph.big_blind) AS avg_net_bb
+                FROM _vh JOIN player_hands ph ON ph.hand_id = _vh.hand_id
+                WHERE ph.player_id = 'ScottyWotty'
+                  AND ph.net_won IS NOT NULL AND ph.big_blind > 0
+            """).fetchone()
+            s_hands = scotty_row['hands']
+            s_won_pct = round(100.0 * scotty_row['wins'] / s_hands, 1) if s_hands else None
+            s_bb100 = (
+                round(float(scotty_row['avg_net_bb']) * 100, 1)
+                if scotty_row['avg_net_bb'] is not None else None
+            )
+        else:
+            s_hands = None
+            s_won_pct = None
+            s_bb100 = None
 
         return {
             'total_hands': total_hands,
             'showdown_pct': showdown_pct,
             'avg_pot_bb': avg_pot_bb,
-            'by_position': by_position,
-            'top_players': [],
             'scotty_hands': s_hands,
             'scotty_won_pct': s_won_pct,
             'scotty_bb_per_100': s_bb100,
