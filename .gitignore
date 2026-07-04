@@ -19,5 +19,8 @@ notebooks/nb_images/
 # Jupyter
 .ipynb_checkpoints/
 
+# Logs
+*.log
+
 # Claude Code
 .claude/

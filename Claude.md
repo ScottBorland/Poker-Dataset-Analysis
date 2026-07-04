@@ -100,7 +100,7 @@ Parsed by `parser_888.py` into the same `Hand` dataclass. Hole cards are visible
 
 ## Database (`db/poker.db`)
 
-Populated by `src/ingest.py`. Contains ~893k hands, ~30k unique players, ~4.6M label rows (208 label types) across both venues.
+Populated by `src/ingest.py`. Contains ~10M hands, ~62M player_hands rows, ~53M label rows (208 label types) across ~11,941 ingested files. The DB is ~30 GB on disk — queries against `player_hands` or `labels` without a covering index will be slow; see `src/add_indexes.py`.
 
 ### Schema
 
