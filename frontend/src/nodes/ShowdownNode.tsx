@@ -10,8 +10,8 @@ export function ShowdownNode({ id, data }: NodeProps) {
   const value = (data.value as ShowdownValue) ?? 'any'
 
   return (
-    <FilterNodeWrapper id={id} title="🎯 Showdown" accent="border-teal-500">
-      <div className="flex rounded overflow-hidden border border-gray-700">
+    <FilterNodeWrapper id={id} title="Showdown" accent="border-teal-400">
+      <div className="flex rounded overflow-hidden border border-gray-200">
         {OPTIONS.map(opt => (
           <button
             key={opt}
@@ -19,7 +19,7 @@ export function ShowdownNode({ id, data }: NodeProps) {
             className={`flex-1 py-1 text-xs font-medium transition-colors capitalize ${
               value === opt
                 ? 'bg-teal-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {opt}

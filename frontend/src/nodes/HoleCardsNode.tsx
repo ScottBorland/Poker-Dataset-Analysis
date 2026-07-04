@@ -18,11 +18,11 @@ export function HoleCardsNode({ id, data }: NodeProps) {
   }
 
   return (
-    <FilterNodeWrapper id={id} title="🃏 Hole Cards" accent="border-purple-500">
+    <FilterNodeWrapper id={id} title="Hole Cards" accent="border-purple-400">
       <button
         ref={btnRef}
         onClick={() => setGridOpen(v => !v)}
-        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-left text-xs text-gray-300 hover:border-purple-400 transition-colors"
+        className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-left text-xs text-gray-700 hover:border-purple-400 transition-colors"
       >
         {summary()}
       </button>

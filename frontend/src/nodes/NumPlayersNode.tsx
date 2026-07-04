@@ -9,11 +9,11 @@ export function NumPlayersNode({ id, data }: NodeProps) {
   const value = (data.value as string) ?? 'any'
 
   return (
-    <FilterNodeWrapper id={id} title="👥 Players" accent="border-orange-500">
+    <FilterNodeWrapper id={id} title="Players" accent="border-orange-400">
       <select
         value={value}
         onChange={e => updateNodeValue(id, e.target.value === 'any' ? 'any' : Number(e.target.value))}
-        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-orange-400"
+        className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-900 text-xs focus:outline-none focus:border-orange-400"
       >
         {OPTIONS.map(o => (
           <option key={o} value={o}>{o === 'any' ? 'Any' : `${o} players`}</option>

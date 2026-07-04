@@ -158,6 +158,16 @@ def build_filter_sql(filters: list[Filter]) -> tuple[str, list[Any]]:
     return sql, params
 
 
+@app.post("/sql")
+def get_sql(req: QueryRequest) -> dict:
+    sql, params = build_filter_sql(req.filters)
+    display_sql = sql
+    for p in params:
+        replacement = f"'{p}'" if isinstance(p, str) else str(p)
+        display_sql = display_sql.replace('?', replacement, 1)
+    return {'sql': display_sql}
+
+
 @app.post("/query")
 def run_query(req: QueryRequest) -> dict:
     filter_sql, params = build_filter_sql(req.filters)

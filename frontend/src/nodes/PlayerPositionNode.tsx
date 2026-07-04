@@ -25,14 +25,14 @@ export function PlayerPositionNode({ id, data }: NodeProps) {
   }
 
   return (
-    <FilterNodeWrapper id={id} title="🪑 Position" accent="border-yellow-500">
+    <FilterNodeWrapper id={id} title="Position" accent="border-yellow-400">
       <input
         type="text"
         value={value.player_id}
         onChange={e => setPlayerId(e.target.value)}
         placeholder="player_id (empty = any player)"
-        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-xs
-                   placeholder-gray-600 focus:outline-none focus:border-yellow-400"
+        className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-gray-900 text-xs
+                   placeholder-gray-400 focus:outline-none focus:border-yellow-400"
       />
       <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 mt-1">
         {POSITIONS.map(p => (
@@ -43,11 +43,11 @@ export function PlayerPositionNode({ id, data }: NodeProps) {
               onChange={() => togglePosition(p)}
               className="accent-yellow-500 shrink-0"
             />
-            <span className="text-gray-300 text-xs">{p}</span>
+            <span className="text-gray-700 text-xs">{p}</span>
           </label>
         ))}
       </div>
-      <div className="text-gray-600 text-xs leading-tight">
+      <div className="text-gray-400 text-xs leading-tight">
         {value.positions.length === 0
           ? 'Select positions to filter.'
           : `${value.positions.join(', ')}${value.player_id.trim() ? ` (${value.player_id.trim()})` : ''} — OR logic.`}

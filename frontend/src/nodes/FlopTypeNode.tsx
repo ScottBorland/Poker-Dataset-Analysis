@@ -42,11 +42,11 @@ export function FlopTypeNode({ id, data }: NodeProps) {
   }
 
   return (
-    <FilterNodeWrapper id={id} title="🂠 Flop Type" accent="border-green-500">
+    <FilterNodeWrapper id={id} title="Flop Type" accent="border-green-400">
       <div className="space-y-2">
         {GROUPS.map(group => (
           <div key={group.label}>
-            <div className="text-gray-600 text-xs mb-0.5 uppercase tracking-wider">{group.label}</div>
+            <div className="text-gray-400 text-xs mb-0.5 uppercase tracking-wider">{group.label}</div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
               {group.options.map(o => (
                 <label key={o.value} className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -56,7 +56,7 @@ export function FlopTypeNode({ id, data }: NodeProps) {
                     onChange={() => toggle(o.value)}
                     className="accent-green-500 shrink-0"
                   />
-                  <span className="text-gray-300 text-xs">{o.label}</span>
+                  <span className="text-gray-700 text-xs">{o.label}</span>
                 </label>
               ))}
             </div>
@@ -64,10 +64,10 @@ export function FlopTypeNode({ id, data }: NodeProps) {
         ))}
       </div>
       {selected.length === 0 && (
-        <div className="text-gray-600 text-xs">No filter (select one or more).</div>
+        <div className="text-gray-400 text-xs">No filter (select one or more).</div>
       )}
       {selected.length > 1 && (
-        <div className="text-green-700 text-xs">{selected.length} selected — AND logic.</div>
+        <div className="text-green-600 text-xs">{selected.length} selected — AND logic.</div>
       )}
     </FilterNodeWrapper>
   )

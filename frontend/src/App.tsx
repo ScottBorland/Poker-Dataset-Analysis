@@ -17,8 +17,8 @@ import '@xyflow/react/dist/style.css'
 import { nodeTypes } from './nodes'
 import { NodePalette } from './components/NodePalette'
 import { FlowContext } from './context/FlowContext'
-import { getFilterChain } from './utils/chainTraversal'
-import { runQueryApi } from './utils/api'
+import { getFilterChain, getFullFilterChain } from './utils/chainTraversal'
+import { runQueryApi, getSqlApi } from './utils/api'
 import { StatsNodeData } from './types'
 
 let _idCounter = 0
@@ -48,9 +48,39 @@ const API_TYPES: Record<string, string> = {
   venue: 'venue',
 }
 
+const DEFAULT_CHAIN: Array<{ type: string; id: string }> = [
+  { type: 'venue',          id: 'default-venue' },
+  { type: 'preflopAction',  id: 'default-preflop' },
+  { type: 'playerPosition', id: 'default-position' },
+  { type: 'holeCards',      id: 'default-holecards' },
+  { type: 'flopType',       id: 'default-floptype' },
+]
+
+function makeDefaultNode(type: string, id: string, index: number): Node {
+  const dv = DEFAULT_VALUES[type] ?? 'any'
+  const value =
+    Array.isArray(dv) ? []
+    : typeof dv === 'object' && dv !== null ? { ...(dv as object) }
+    : dv
+  return {
+    id,
+    type,
+    position: { x: 80 + index * 260, y: 150 },
+    data: { type: API_TYPES[type], value },
+  }
+}
+
+const INITIAL_NODES: Node[] = DEFAULT_CHAIN.map((n, i) => makeDefaultNode(n.type, n.id, i))
+const INITIAL_EDGES: Edge[] = DEFAULT_CHAIN.slice(0, -1).map((n, i) => ({
+  id: `default-edge-${i}`,
+  source: n.id,
+  target: DEFAULT_CHAIN[i + 1].id,
+  animated: true,
+}))
+
 export default function App() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(INITIAL_NODES)
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(INITIAL_EDGES)
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -141,7 +171,12 @@ export default function App() {
     }
   }, [setNodes, setEdges])
 
-  const contextValue = useMemo(() => ({ runQuery, updateNodeValue, deleteNode }), [runQuery, updateNodeValue, deleteNode])
+  const checkSql = useCallback(async (nodeId: string): Promise<string> => {
+    const filters = getFullFilterChain(nodeId, nodesRef.current, edgesRef.current)
+    return getSqlApi(filters)
+  }, [])
+
+  const contextValue = useMemo(() => ({ runQuery, checkSql, updateNodeValue, deleteNode }), [runQuery, checkSql, updateNodeValue, deleteNode])
 
   const onConnect = useCallback((connection: Connection) => {
     setEdges(eds => addEdge({ ...connection, animated: true }, eds))
@@ -174,7 +209,7 @@ export default function App() {
 
   return (
     <FlowContext.Provider value={contextValue}>
-      <div className="flex h-screen w-screen overflow-hidden bg-gray-950">
+      <div className="flex h-screen w-screen overflow-hidden bg-gray-50">
         <NodePalette />
         <div ref={wrapperRef} className="flex-1 h-full">
           <ReactFlow
@@ -194,7 +229,7 @@ export default function App() {
             }}
           >
             <Controls />
-            <Background variant={BackgroundVariant.Dots} color="#1f2937" gap={24} size={1} />
+            <Background variant={BackgroundVariant.Cross} color="#d1d5db" gap={24} size={1} />
           </ReactFlow>
         </div>
       </div>

@@ -3,19 +3,18 @@ import type { DragEvent } from 'react'
 interface PaletteItem {
   type: string
   label: string
-  icon: string
   accent: string
 }
 
 const ITEMS: PaletteItem[] = [
-  { type: 'venue', label: 'Venue', icon: '🏛', accent: 'border-indigo-500 text-indigo-400' },
-  { type: 'numPlayers', label: 'Players', icon: '👥', accent: 'border-orange-500 text-orange-400' },
-  { type: 'holeCards', label: 'Hole Cards', icon: '🃏', accent: 'border-purple-500 text-purple-400' },
-  { type: 'showdown', label: 'Showdown', icon: '🎯', accent: 'border-teal-500 text-teal-400' },
-  { type: 'flopType', label: 'Flop Type', icon: '🂠', accent: 'border-green-500 text-green-400' },
-  { type: 'preflopAction', label: 'Preflop Action', icon: '♠', accent: 'border-blue-500 text-blue-400' },
-  { type: 'playerName', label: 'Player', icon: '🙋', accent: 'border-rose-500 text-rose-400' },
-  { type: 'playerPosition', label: 'Position', icon: '🪑', accent: 'border-yellow-500 text-yellow-400' },
+  { type: 'venue',          label: 'Venue',          accent: 'border-indigo-400 text-indigo-600' },
+  { type: 'numPlayers',     label: 'Players',         accent: 'border-orange-400 text-orange-600' },
+  { type: 'holeCards',      label: 'Hole Cards',      accent: 'border-purple-400 text-purple-600' },
+  { type: 'showdown',       label: 'Showdown',        accent: 'border-teal-400   text-teal-600'   },
+  { type: 'flopType',       label: 'Flop Type',       accent: 'border-green-400  text-green-600'  },
+  { type: 'preflopAction',  label: 'Preflop Action',  accent: 'border-blue-400   text-blue-600'   },
+  { type: 'playerName',     label: 'Player',          accent: 'border-rose-400   text-rose-600'   },
+  { type: 'playerPosition', label: 'Position',        accent: 'border-yellow-400 text-yellow-600' },
 ]
 
 export function NodePalette() {
@@ -25,21 +24,20 @@ export function NodePalette() {
   }
 
   return (
-    <div className="w-44 shrink-0 bg-gray-950 border-r border-gray-800 flex flex-col p-3 gap-2">
-      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Filters</div>
+    <div className="w-44 shrink-0 bg-white border-r border-gray-200 flex flex-col p-3 gap-2">
+      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filters</div>
       {ITEMS.map(item => (
         <div
           key={item.type}
           draggable
           onDragStart={e => onDragStart(e, item.type)}
-          className={`flex items-center gap-2 px-2 py-2 rounded border bg-gray-900 cursor-grab active:cursor-grabbing select-none
-            ${item.accent} hover:bg-gray-800 transition-colors`}
+          className={`flex items-center px-2 py-2 rounded border bg-white cursor-grab active:cursor-grabbing select-none
+            ${item.accent} hover:bg-gray-50 transition-colors`}
         >
-          <span className="text-base leading-none">{item.icon}</span>
-          <span className="text-xs font-medium text-gray-300">{item.label}</span>
+          <span className="text-xs font-medium text-gray-700">{item.label}</span>
         </div>
       ))}
-      <div className="mt-auto text-xs text-gray-600 leading-relaxed">
+      <div className="mt-auto text-xs text-gray-400 leading-relaxed">
         Drag a filter onto the canvas, connect nodes, then click <strong className="text-gray-500">Run Query</strong>.
       </div>
     </div>

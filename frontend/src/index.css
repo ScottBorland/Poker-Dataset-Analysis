@@ -7,7 +7,7 @@ html, body, #root {
   width: 100%;
   margin: 0;
   padding: 0;
-  background: #030712;
+  background: #f9fafb;
 }
 
 /* React Flow overrides */
@@ -15,16 +15,28 @@ html, body, #root {
   font-family: inherit;
 }
 
+.react-flow,
+.react-flow__pane,
+.react-flow__pane.draggable,
+.react-flow__viewport,
+.react-flow__renderer {
+  cursor: default !important;
+}
+
+.react-flow__pane.dragging {
+  cursor: grabbing !important;
+}
+
 .react-flow__handle {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: #6366f1;
-  border: 2px solid #030712;
+  border: 2px solid #fff;
 }
 
 .react-flow__handle:hover {
-  background: #a5b4fc;
+  background: #4f46e5;
 }
 
 .react-flow__edge-path {
@@ -33,17 +45,17 @@ html, body, #root {
 }
 
 .react-flow__controls {
-  background: #111827;
-  border: 1px solid #1f2937;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
 }
 
 .react-flow__controls-button {
-  background: #111827;
-  border-bottom: 1px solid #1f2937;
-  fill: #9ca3af;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  fill: #6b7280;
 }
 
 .react-flow__controls-button:hover {
-  background: #1f2937;
+  background: #f3f4f6;
 }

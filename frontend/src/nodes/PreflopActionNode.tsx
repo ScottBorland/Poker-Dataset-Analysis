@@ -26,7 +26,7 @@ export function PreflopActionNode({ id, data }: NodeProps) {
   }
 
   return (
-    <FilterNodeWrapper id={id} title="♠ Preflop Action" accent="border-blue-500">
+    <FilterNodeWrapper id={id} title="Preflop Action" accent="border-blue-400">
       <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
         {OPTIONS.map(o => (
           <label key={o.value} className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -36,15 +36,15 @@ export function PreflopActionNode({ id, data }: NodeProps) {
               onChange={() => toggle(o.value)}
               className="accent-blue-500 shrink-0"
             />
-            <span className="text-gray-300 text-xs">{o.label}</span>
+            <span className="text-gray-700 text-xs">{o.label}</span>
           </label>
         ))}
       </div>
       {selected.length === 0 && (
-        <div className="text-gray-600 text-xs">No filter (select one or more).</div>
+        <div className="text-gray-400 text-xs">No filter (select one or more).</div>
       )}
       {selected.length > 1 && (
-        <div className="text-blue-700 text-xs">{selected.length} selected — OR logic.</div>
+        <div className="text-blue-600 text-xs">{selected.length} selected — OR logic.</div>
       )}
     </FilterNodeWrapper>
   )
