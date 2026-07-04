@@ -149,7 +149,40 @@ CREATE INDEX idx_player     ON player_hands(player_id);
 CREATE INDEX idx_ph_hand    ON player_hands(hand_id);
 CREATE INDEX idx_label      ON labels(label);
 CREATE INDEX idx_label_hand ON labels(hand_id);
+
+-- Fingerprints: strategically-equivalent situation keys.
+-- One row per player per street reached. See src/fingerprint.py.
+CREATE TABLE fingerprints (
+    hand_id             INTEGER NOT NULL,
+    file                TEXT NOT NULL,
+    player_idx          INTEGER NOT NULL,   -- 1-indexed seat
+    street              TEXT NOT NULL,      -- 'preflop'|'flop'|'turn'|'river'
+    positions           TEXT,               -- HU: 'BTN_vs_BB' etc.  Multiway: 'multiway'
+    n_players_street    INTEGER,            -- players in the hand at start of this street
+    pot_type            TEXT,               -- 'unopened'|'limped'|'srp'|'3bet'|'4bet'|'5bet+'
+    in_position         INTEGER,            -- 1 if last-to-act postflop, else 0
+    facing              TEXT,               -- preflop: 'unopened'|'facing_limp'|'facing_raise'|'facing_3bet'|'facing_4bet'|'facing_5bet+'
+                                            -- postflop: 'first_to_act'|'facing_check'|'facing_bet'|'facing_raise'
+    spr_bucket          TEXT,               -- '0-3'|'3-6'|'6-13'|'13-20'|'20+'  (NULL preflop)
+    board_high_card     TEXT,               -- 'A'..'2'  (NULL preflop)
+    board_paired        INTEGER,
+    board_monotone      INTEGER,            -- 3+ same suit -> flush possible
+    board_two_tone      INTEGER,            -- exactly 2 same suit -> flush draw only
+    board_connectedness TEXT,               -- 'connected'|'gapped'|'disconnected'
+    PRIMARY KEY (hand_id, player_idx, street)
+);
+CREATE INDEX idx_fp_hand      ON fingerprints(hand_id);
+CREATE INDEX idx_fp_street    ON fingerprints(street);
+CREATE INDEX idx_fp_situation ON fingerprints(pot_type, positions, board_high_card);
 ```
+
+**Note on HU positions:** In the .phhs data, HU seat convention differs from
+the 3+-player one. `src/fingerprint.py` resolves HU positions dynamically:
+the player who acts LAST postflop is tagged `BTN`. The 3+-player positions
+still come from `hand_utils.assign_positions`. Also note: `hand_utils`'s
+`POSITION_NAMES_2` mapping is stale/incorrect for HU; only fingerprints use
+the corrected resolution, so the `position` column on `player_hands` may
+label HU seats inversely.
 
 ### Common Queries
 
@@ -252,6 +285,21 @@ Per hand, ingest writes:
 - All auto-labels from `label_hand()` into the `labels` table
 
 **Note:** `poker.db` holds auto-labels only. Manual labels (`labeller.py --add`) go to `labels/labels.db`.
+
+### Backfilling fingerprints
+
+New ingests populate `fingerprints` automatically. To compute them for the
+already-ingested ~10M hands, run the resumable backfill script (re-parses
+each source file — no full `--reprocess-all` needed):
+
+```bash
+python src/backfill_fingerprints.py            # all files, resumable
+python src/backfill_fingerprints.py --limit 50 # first 50 files (smoke test)
+python src/backfill_fingerprints.py --force    # re-do files already fingerprinted
+```
+
+Expect ~5–10 fingerprints per hand → ~50–100M rows total. Backfill takes on
+the order of 1–3 hours on the full dataset.
 
 ---
 

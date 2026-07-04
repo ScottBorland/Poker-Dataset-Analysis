@@ -26,6 +26,7 @@ from hand_utils import (
     compute_vpip_pfr,
 )
 from labeller import label_hand
+from fingerprint import compute_fingerprints
 
 DB_PATH = Path(__file__).parent.parent / 'db' / 'poker.db'
 PROGRESS_FILE = Path(__file__).parent.parent / 'db' / 'reprocess_progress.txt'
@@ -68,6 +69,25 @@ CREATE TABLE IF NOT EXISTS labels (
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS fingerprints (
+    hand_id             INTEGER NOT NULL,
+    file                TEXT NOT NULL,
+    player_idx          INTEGER NOT NULL,
+    street              TEXT NOT NULL,
+    positions           TEXT,
+    n_players_street    INTEGER,
+    pot_type            TEXT,
+    in_position         INTEGER,
+    facing              TEXT,
+    spr_bucket          TEXT,
+    board_high_card     TEXT,
+    board_paired        INTEGER,
+    board_monotone      INTEGER,
+    board_two_tone      INTEGER,
+    board_connectedness TEXT,
+    PRIMARY KEY (hand_id, player_idx, street)
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_label
     ON labels(hand_id, label, COALESCE(player_idx, -1));
 CREATE INDEX IF NOT EXISTS idx_player      ON player_hands(player_id);
@@ -77,6 +97,11 @@ CREATE INDEX IF NOT EXISTS idx_big_blind   ON player_hands(big_blind);
 CREATE INDEX IF NOT EXISTS idx_label       ON labels(label);
 CREATE INDEX IF NOT EXISTS idx_label_hand  ON labels(hand_id);
 CREATE INDEX IF NOT EXISTS idx_labels_file ON labels(file);
+CREATE INDEX IF NOT EXISTS idx_fp_hand     ON fingerprints(hand_id);
+CREATE INDEX IF NOT EXISTS idx_fp_file     ON fingerprints(file);
+CREATE INDEX IF NOT EXISTS idx_fp_street   ON fingerprints(street);
+CREATE INDEX IF NOT EXISTS idx_fp_situation
+    ON fingerprints(pot_type, positions, board_high_card);
 """
 
 
@@ -109,6 +134,7 @@ def _ingested_files(conn: sqlite3.Connection) -> set[str]:
 def _remove_file(conn: sqlite3.Connection, filename: str) -> None:
     conn.execute("DELETE FROM player_hands WHERE file = ?", (filename,))
     conn.execute("DELETE FROM labels WHERE file = ?", (filename,))
+    conn.execute("DELETE FROM fingerprints WHERE file = ?", (filename,))
     conn.execute("DELETE FROM ingested_files WHERE filename = ?", (filename,))
     conn.commit()
 
@@ -136,6 +162,7 @@ def ingest_file(conn: sqlite3.Connection, path: Path, venue: str = 'absolute_pok
 
     player_rows: list[tuple] = []
     label_rows: list[tuple] = []
+    fp_rows: list[tuple] = []
 
     for hand in hands:
         positions = assign_positions(hand)
@@ -176,6 +203,19 @@ def ingest_file(conn: sqlite3.Connection, path: Path, venue: str = 'absolute_pok
                 lr.hand_id, lr.file, lr.label, lr.street, lr.player_idx, lr.note,
             ))
 
+        for fp in compute_fingerprints(hand):
+            fp_rows.append((
+                fp.hand_id, fp.file, fp.player_idx, fp.street,
+                fp.positions, fp.n_players_street, fp.pot_type,
+                int(fp.in_position),
+                fp.facing, fp.spr_bucket,
+                fp.board_high_card,
+                None if fp.board_paired is None else int(fp.board_paired),
+                None if fp.board_monotone is None else int(fp.board_monotone),
+                None if fp.board_two_tone is None else int(fp.board_two_tone),
+                fp.board_connectedness,
+            ))
+
     conn.executemany(
         "INSERT OR IGNORE INTO player_hands"
         "(player_id, hand_id, file, seat_idx, n_players, position, stack, invested,"
@@ -187,6 +227,14 @@ def ingest_file(conn: sqlite3.Connection, path: Path, venue: str = 'absolute_pok
         "INSERT OR IGNORE INTO labels(hand_id, file, label, street, player_idx, note)"
         " VALUES (?,?,?,?,?,?)",
         label_rows,
+    )
+    conn.executemany(
+        "INSERT OR IGNORE INTO fingerprints"
+        "(hand_id, file, player_idx, street, positions, n_players_street, pot_type,"
+        " in_position, facing, spr_bucket, board_high_card, board_paired,"
+        " board_monotone, board_two_tone, board_connectedness)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        fp_rows,
     )
     conn.execute(
         "INSERT OR REPLACE INTO ingested_files(filename, hand_count) VALUES (?,?)",
