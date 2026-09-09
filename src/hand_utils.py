@@ -201,6 +201,68 @@ def compute_investments(hand: 'Hand') -> list[float]:
 
 
 # ---------------------------------------------------------------------------
+# Street-start state (exact stacks/pot at the start of a given street)
+# ---------------------------------------------------------------------------
+
+def street_start_state(hand: 'Hand', target_street: str) -> tuple[list[float], float, set[int]]:
+    """
+    Replay the hand up to the start of target_street.
+    Return (remaining_stacks_0idx, pot_at_start, players_still_in_1idx).
+    """
+    n = hand.n_players
+    stacks = list(hand.starting_stacks)
+    still_in = set(range(1, n + 1))
+    street_bets = [0.0] * n
+    pot = 0.0
+
+    for i, ante in enumerate(hand.antes[:n]):
+        amt = min(ante, stacks[i])
+        stacks[i] -= amt
+        pot += amt
+    for i, blind in enumerate(hand.blinds_or_straddles[:n]):
+        amt = min(blind, stacks[i])
+        stacks[i] -= amt
+        street_bets[i] = amt
+
+    street_order = ['preflop', 'flop', 'turn', 'river']
+
+    if target_street == 'preflop':
+        return stacks, pot + sum(street_bets), still_in
+
+    db_count = 0
+    for action in hand.actions:
+        if action.startswith('d db'):
+            pot += sum(street_bets)
+            street_bets = [0.0] * n
+            db_count += 1
+            if db_count < len(street_order) and street_order[db_count] == target_street:
+                return stacks, pot, still_in
+            continue
+
+        parts = action.split()
+        if not (parts and parts[0].startswith('p') and parts[0][1:].isdigit()):
+            continue
+        pidx = int(parts[0][1:])
+        i = pidx - 1
+        verb = parts[1] if len(parts) > 1 else ''
+
+        if verb == 'f':
+            still_in.discard(pidx)
+        elif verb == 'cbr' and len(parts) >= 3:
+            total_bet = float(parts[2])
+            add = min(max(total_bet - street_bets[i], 0.0), stacks[i])
+            stacks[i] -= add
+            street_bets[i] += add
+        elif verb == 'cc':
+            facing = max(street_bets) if street_bets else 0.0
+            add = min(max(facing - street_bets[i], 0.0), stacks[i])
+            stacks[i] -= add
+            street_bets[i] += add
+
+    return stacks, pot + sum(street_bets), still_in
+
+
+# ---------------------------------------------------------------------------
 # Position assignment
 # ---------------------------------------------------------------------------
 

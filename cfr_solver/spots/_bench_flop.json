@@ -1,0 +1,22 @@
+{
+  "spot_id": "_bench_flop",
+  "fingerprint_type": {
+    "street": "flop", "positions": "CO_vs_BB", "n_players_street": 2,
+    "pot_type": "srp", "in_position": false, "facing": "first_to_act",
+    "spr_bucket": "13-20", "board_high_card": "Q", "board_paired": false,
+    "board_monotone": false, "board_two_tone": true, "board_connectedness": "disconnected"
+  },
+  "street": "flop",
+  "positions": "CO_vs_BB",
+  "n_matching_hands": 44,
+  "effective_stack_bb": 97.5,
+  "pot_bb_at_street_start": 5.5,
+  "action_abstraction": "bet_buckets",
+  "bet_size_fractions": [0.5, 1.0],
+  "board": "Qs7s2d",
+  "ranges": {
+    "oop": {"position": "BB", "range_pct": 60},
+    "ip": {"position": "CO", "range_pct": 26}
+  },
+  "source": {"venue": "benchmark", "generator": "manual"}
+}

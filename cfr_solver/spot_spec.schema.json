@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Spot Spec",
+  "description": "The file-based contract between src/spot_spec_export.py (producer) and cfr_solver/ (consumer). No shared Python code — this schema is the single source of truth for the shape.",
+  "type": "object",
+  "required": [
+    "spot_id", "fingerprint_type", "street", "positions",
+    "n_matching_hands", "effective_stack_bb", "pot_bb_at_street_start",
+    "action_abstraction", "board", "ranges", "source"
+  ],
+  "properties": {
+    "spot_id": {
+      "type": "string",
+      "description": "Unique identifier; also used as the output filename stem."
+    },
+    "fingerprint_type": {
+      "type": "object",
+      "description": "The 12-column fingerprint tuple this spec was derived from (see CLAUDE.md `fingerprints` schema / src/fingerprint.py).",
+      "properties": {
+        "street": {"type": "string", "enum": ["preflop", "flop", "turn", "river"]},
+        "positions": {"type": "string", "description": "'X_vs_Y' heads-up positions string, e.g. 'BTN_vs_BB'."},
+        "n_players_street": {"type": "integer"},
+        "pot_type": {"type": "string", "enum": ["unopened", "limped", "srp", "3bet", "4bet", "5bet+"]},
+        "in_position": {"type": ["boolean", "null"]},
+        "facing": {"type": "string"},
+        "spr_bucket": {"type": ["string", "null"]},
+        "board_high_card": {"type": ["string", "null"]},
+        "board_paired": {"type": ["boolean", "null"]},
+        "board_monotone": {"type": ["boolean", "null"]},
+        "board_two_tone": {"type": ["boolean", "null"]},
+        "board_connectedness": {"type": ["string", "null"]}
+      }
+    },
+    "street": {"type": "string", "enum": ["preflop", "flop", "turn", "river"]},
+    "positions": {"type": "string"},
+    "n_matching_hands": {
+      "type": "integer",
+      "description": "How many real hands this spec was derived from (sample-size floor enforced upstream in spot_priority.py, default >= 30)."
+    },
+    "effective_stack_bb": {
+      "type": "number",
+      "description": "Median (not mean, to avoid all-in outlier skew) of min(remaining stacks) / big_blind across matching hands, at the start of `street`."
+    },
+    "pot_bb_at_street_start": {
+      "type": "number",
+      "description": "Median pot size in BB at the start of `street`."
+    },
+    "action_abstraction": {
+      "type": "string",
+      "enum": ["push_fold", "bet_buckets"],
+      "description": "'push_fold': only fold/check-or-call/all-in are legal (no intermediate bet sizes). 'bet_buckets': a handful of pot-fraction bet sizes per street, derived from observed bets in matching real hands (src/spot_spec_export.py:_derive_bet_size_fractions). Consumed by cfr_solver/texas_adapter.py's set_bet_sizes."
+    },
+    "board": {
+      "type": ["string", "null"],
+      "description": "Concrete representative board as a concatenated card string (e.g. '4c8h9dAc'), or null for preflop. Chosen as the most common actual board among matching hands sharing this fingerprint type — fingerprints only store a texture bucket, not real cards, so one concrete instance is picked for solving."
+    },
+    "ranges": {
+      "type": "object",
+      "description": "Static range-chart percentages (src/range_charts.py) for OOP/IP, e.g. {'oop': {'position': 'BB', 'range_pct': 40}, 'ip': {...}}. Fed into cfr_solver/texas_adapter.py's set_range_oop/set_range_ip so hole cards are dealt from each seat's realistic range rather than uniformly. May be null/omitted when the chart doesn't cover this facing/pot_type."
+    },
+    "source": {
+      "type": "object",
+      "required": ["venue", "generator"],
+      "properties": {
+        "venue": {"type": "string"},
+        "generator": {"type": "string"}
+      }
+    }
+  }
+}

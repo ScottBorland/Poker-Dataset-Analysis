@@ -449,6 +449,48 @@ def hands_with_label(
             conn.close()
 
 
+def load_hands_by_id(file_rows) -> list:
+    """Load Hand objects for a set of (hand_id, file, venue) rows.
+
+    Groups by (file, venue) so each source file is only parsed once,
+    regardless of how many hand_ids are needed from it.
+    """
+    from collections import defaultdict
+    from parser import load_file
+    from parser_888 import load_file_888
+
+    by_file: dict[tuple[str, str], set[int]] = defaultdict(set)
+    for hand_id, file_, venue in file_rows:
+        by_file[(file_, venue)].add(hand_id)
+
+    phhs_map = _get_phhs_path_map()
+    data_dir = _ROOT / 'data'
+    loaded_hands: list = []
+
+    for (filename, venue), ids in sorted(by_file.items()):
+        if venue == '888poker':
+            path = data_dir / '888poker' / filename
+            if not path.exists():
+                print(f"[load_hands_by_id] File not found, skipping: {filename}")
+                continue
+            loaded_hands.extend(h for h in load_file_888(path) if h.hand_id in ids)
+        else:
+            # Abs poker files may be nested — try all paths matching this basename
+            candidates = phhs_map.get(filename, [])
+            if not candidates:
+                print(f"[load_hands_by_id] File not found, skipping: {filename}")
+                continue
+            found_ids: set[int] = set()
+            for path in candidates:
+                new_hands = [h for h in load_file(path) if h.hand_id in ids and h.hand_id not in found_ids]
+                loaded_hands.extend(new_hands)
+                found_ids.update(h.hand_id for h in new_hands)
+                if found_ids >= ids:
+                    break   # found all needed hands from this filename
+
+    return loaded_hands
+
+
 def label_replay(
     labels: str | list[str],
     player_id: str | None = None,
@@ -591,38 +633,7 @@ def label_replay(
 
     # ---- 5. Load Hand objects from disk ----
     # Always load — also needed to compute pot-in-BB even when replay=False
-    from collections import defaultdict
-    from parser import load_file
-    from parser_888 import load_file_888
-
-    by_file: dict[tuple[str, str], set[int]] = defaultdict(set)
-    for hand_id, file_, venue in file_rows:
-        by_file[(file_, venue)].add(hand_id)
-
-    phhs_map = _get_phhs_path_map()
-    data_dir = _ROOT / 'data'
-    loaded_hands: list = []
-
-    for (filename, venue), ids in sorted(by_file.items()):
-        if venue == '888poker':
-            path = data_dir / '888poker' / filename
-            if not path.exists():
-                print(f"[label_replay] File not found, skipping: {filename}")
-                continue
-            loaded_hands.extend(h for h in load_file_888(path) if h.hand_id in ids)
-        else:
-            # Abs poker files may be nested — try all paths matching this basename
-            candidates = phhs_map.get(filename, [])
-            if not candidates:
-                print(f"[label_replay] File not found, skipping: {filename}")
-                continue
-            found_ids: set[int] = set()
-            for path in candidates:
-                new_hands = [h for h in load_file(path) if h.hand_id in ids and h.hand_id not in found_ids]
-                loaded_hands.extend(new_hands)
-                found_ids.update(h.hand_id for h in new_hands)
-                if found_ids >= ids:
-                    break   # found all needed hands from this filename
+    loaded_hands = load_hands_by_id(file_rows)
 
     # ---- 6. Compute avg pot-in-BB from loaded hands ----
     # Use sum(compute_investments) — correctly returns uncalled bets, unlike final_pot()
