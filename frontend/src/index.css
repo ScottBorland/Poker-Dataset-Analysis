@@ -7,55 +7,44 @@ html, body, #root {
   width: 100%;
   margin: 0;
   padding: 0;
-  background: #f9fafb;
+  background: #201e1d;
+  color: #f3f2f2;
+  font-family: 'Archivo', ui-sans-serif, system-ui, sans-serif;
 }
 
-/* React Flow overrides */
-.react-flow__node {
-  font-family: inherit;
+*, *::before, *::after {
+  border-radius: 0;
 }
 
+/* Modernist: never the browser default focus ring. */
+:focus-visible {
+  outline: 2px solid #ff563c;
+  outline-offset: 2px;
+}
+
+/* No easing flourishes — the system is flat. */
+button, a, input, select {
+  transition-duration: 120ms;
+}
+
+/* Dark number inputs — kill the bright spinner chrome. */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  opacity: 0.35;
+}
+
+/* React Flow overrides (parked pages still import it). */
+.react-flow__node { font-family: inherit; }
 .react-flow,
 .react-flow__pane,
 .react-flow__pane.draggable,
 .react-flow__viewport,
-.react-flow__renderer {
-  cursor: default !important;
-}
-
-.react-flow__pane.dragging {
-  cursor: grabbing !important;
-}
-
+.react-flow__renderer { cursor: default !important; }
+.react-flow__pane.dragging { cursor: grabbing !important; }
 .react-flow__handle {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  background: #6366f1;
-  border: 2px solid #fff;
+  background: #ff563c;
+  border: 2px solid #201e1d;
 }
-
-.react-flow__handle:hover {
-  background: #4f46e5;
-}
-
-.react-flow__edge-path {
-  stroke: #4f46e5;
-  stroke-width: 2;
-}
-
-.react-flow__controls {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-
-.react-flow__controls-button {
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  fill: #6b7280;
-}
-
-.react-flow__controls-button:hover {
-  background: #f3f4f6;
-}
+.react-flow__edge-path { stroke: #ff563c; stroke-width: 2; }

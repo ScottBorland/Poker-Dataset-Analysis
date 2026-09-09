@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap"><style>body{margin:0;background:#e6e4e2;font-family:Archivo,system-ui,sans-serif}a{color:#ec3013}a:hover{color:#ae1800}.dv-turn{padding:40px 44px 32px;border-bottom:2px solid rgba(32,30,29,.4)}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:800 10px Archivo,sans-serif;letter-spacing:.08em;padding:4px 8px;background:#201e1d;color:#f3f2f2;text-decoration:none}.dv-tname{font:800 13px/1.2 Archivo,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#201e1d}.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}.dv-oid{font:800 10.5px Archivo,sans-serif;letter-spacing:.08em;padding:4px 8px;background:rgba(32,30,29,.12);color:#201e1d;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:10px;font:400 12px/1.3 Archivo,sans-serif;color:rgba(32,30,29,.62)}.dv-card{border:2px solid rgba(32,30,29,.4);overflow:hidden}.dv-opt:target .dv-oid{background:#ec3013;color:#f3f2f2}.dv-next{margin:24px 0 0;font:400 12px/1.6 Archivo,sans-serif;color:rgba(32,30,29,.6)}</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Poker Flow · Modernist · first pass</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Light Modernist chrome, table as a dark inset panel</div>
+<div class="dv-card" style="width:1360px;background:#f3f2f2;color:#201e1d">
+
+<div style="display:flex;align-items:stretch;border-bottom:2px solid rgba(32,30,29,.4);background:#f3f2f2">
+<div style="display:flex;align-items:center;padding:0 20px;font:800 15px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase;border-right:2px solid rgba(32,30,29,.4)">Poker<span style="color:#ec3013">Flow</span></div>
+<div style="display:flex">
+<div style="padding:16px 22px;font:800 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;border-right:1px solid rgba(32,30,29,.25);border-bottom:3px solid #ec3013">Hand builder</div>
+<div style="padding:16px 22px;font:600 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;border-right:1px solid rgba(32,30,29,.25)">Explorer</div>
+<div style="padding:16px 22px;font:600 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;border-right:1px solid rgba(32,30,29,.25)">Query</div>
+</div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:10px;padding:0 16px">
+<span style="font:600 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#605d5d">Players</span>
+<div style="border:1px solid rgba(32,30,29,.4);padding:6px 10px;font:600 13px Archivo,sans-serif;background:#f8f4f4">6 ▾</div>
+<span style="font:600 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#605d5d">Stacks BB</span>
+<div style="border:1px solid rgba(32,30,29,.4);padding:6px 10px;font:600 13px Archivo,sans-serif;background:#f8f4f4;width:64px">100</div>
+<button style="border:1px solid rgba(32,30,29,.4);background:transparent;padding:7px 12px;font:800 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;color:#201e1d" style-hover="background:rgba(32,30,29,.07)">Undo</button>
+<button style="border:1px solid rgba(32,30,29,.4);background:transparent;padding:7px 12px;font:800 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;color:#201e1d" style-hover="background:rgba(32,30,29,.07)">Reset hand</button>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 432px">
+<div style="border-right:2px solid rgba(32,30,29,.4)">
+
+<div style="background:#201e1d;color:#f3f2f2;padding:28px 28px 24px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9b9797">Table · 6-max · 100 BB deep</div>
+<div style="font:600 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9b9797">Flop</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:rgba(243,242,242,.18)">
+
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#605d5d">UTG</span><span style="font:600 11px Archivo,sans-serif;color:#605d5d;margin-left:auto">100</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#2d2b2b;border:1px solid #444141"></div><div style="width:30px;height:42px;background:#2d2b2b;border:1px solid #444141"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#605d5d">HJ</span><span style="font:600 11px Archivo,sans-serif;color:#605d5d;margin-left:auto">100</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#2d2b2b;border:1px solid #444141"></div><div style="width:30px;height:42px;background:#2d2b2b;border:1px solid #444141"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+
+<div style="background:#2d2b2b;padding:14px 16px;box-shadow:inset 0 0 0 2px #ff563c">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#f3f2f2">CO</span><span style="background:#ff563c;color:#201e1d;font:800 9px Archivo,sans-serif;letter-spacing:.1em;padding:2px 5px">HERO</span><span style="font:600 11px Archivo,sans-serif;color:#f3f2f2;margin-left:auto">97</span></div>
+<div style="display:flex;gap:3px">
+<div style="width:30px;height:42px;background:#f8f4f4;color:#ec3013;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">Q<div style="font-size:13px;line-height:1">♥</div></div>
+<div style="width:30px;height:42px;background:#f8f4f4;color:#ec3013;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">J<div style="font-size:13px;line-height:1">♥</div></div>
+</div>
+<div style="margin-top:8px;font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#ff9783">Bet 3.00 BB</div>
+</div>
+
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#f3f2f2">BB</span><span style="font:600 11px Archivo,sans-serif;color:#9b9797;margin-left:auto">99</span></div>
+<div style="display:flex;gap:3px">
+<div style="width:30px;height:42px;background:#f8f4f4;color:#ec3013;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">K<div style="font-size:13px;line-height:1">♦</div></div>
+<div style="width:30px;height:42px;background:#f8f4f4;color:#201e1d;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">J<div style="font-size:13px;line-height:1">♠</div></div>
+</div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+
+<div style="background:#2d2b2b;padding:20px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:12px">
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9b9797">Board · K-high rainbow</div>
+<div style="display:flex;gap:4px">
+<div style="width:44px;height:62px;background:#f8f4f4;color:#201e1d;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">4<div style="font-size:18px;line-height:1.1">♠</div></div>
+<div style="width:44px;height:62px;background:#f8f4f4;color:#ec3013;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">T<div style="font-size:18px;line-height:1.1">♦</div></div>
+<div style="width:44px;height:62px;background:#f8f4f4;color:#ec3013;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">K<div style="font-size:18px;line-height:1.1">♥</div></div>
+<div style="width:44px;height:62px;border:2px dashed #444141"></div>
+<div style="width:44px;height:62px;border:2px dashed #444141"></div>
+</div>
+<div style="font:800 26px/1 Archivo,sans-serif;letter-spacing:-.02em">POT 7.00 BB</div>
+<div style="font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797">Last: BB folds</div>
+</div>
+
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#605d5d">BTN</span><span style="border:1px solid #605d5d;color:#605d5d;font:800 9px Archivo,sans-serif;padding:1px 4px">D</span><span style="font:600 11px Archivo,sans-serif;color:#605d5d;margin-left:auto">100</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#2d2b2b;border:1px solid #444141"></div><div style="width:30px;height:42px;background:#2d2b2b;border:1px solid #444141"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+
+<div style="background:#201e1d;padding:14px 16px"></div>
+
+<div style="background:#2d2b2b;padding:14px 16px;box-shadow:inset 0 0 0 2px #f3f2f2">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#f3f2f2">SB</span><span style="background:#f3f2f2;color:#201e1d;font:800 9px Archivo,sans-serif;letter-spacing:.1em;padding:2px 5px">TO ACT</span><span style="font:600 11px Archivo,sans-serif;color:#f3f2f2;margin-left:auto">97</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#444141;border:1px solid #605d5d"></div><div style="width:30px;height:42px;background:#444141;border:1px solid #605d5d"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797">Facing 3.00 BB</div>
+</div>
+
+<div style="background:#201e1d;padding:14px 16px"></div>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:2px solid rgba(32,30,29,.4);flex-wrap:wrap">
+<span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;margin-right:6px">SB to act</span>
+<button style="border:1px solid rgba(32,30,29,.4);background:transparent;padding:9px 16px;font:800 12px Archivo,sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:#201e1d" style-hover="background:#ffe0d9;border-color:#ec3013">Fold</button>
+<button style="border:1px solid rgba(32,30,29,.4);background:transparent;padding:9px 16px;font:800 12px Archivo,sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:#201e1d" style-hover="background:rgba(32,30,29,.07)">Call 3.00</button>
+<div style="border:1px solid rgba(32,30,29,.4);padding:9px 12px;font:600 13px Archivo,sans-serif;color:#605d5d;background:#f8f4f4;width:92px">6.5+</div>
+<button style="border:1px solid #ec3013;background:#ec3013;color:#f3f2f2;padding:9px 18px;font:800 12px Archivo,sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer" style-hover="background:#dd2b0f">Raise to</button>
+<div style="display:flex;gap:0;margin-left:4px">
+<button style="border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#605d5d" style-hover="background:rgba(32,30,29,.07)">⅓ pot</button>
+<button style="border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#605d5d" style-hover="background:rgba(32,30,29,.07)">½ pot</button>
+<button style="border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#605d5d" style-hover="background:rgba(32,30,29,.07)">⅔ pot</button>
+<button style="border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#605d5d" style-hover="background:rgba(32,30,29,.07)">pot</button>
+<button style="border:1px solid rgba(32,30,29,.3);background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#605d5d" style-hover="background:rgba(32,30,29,.07)">all-in</button>
+</div>
+<span style="margin-left:auto;font:400 11px Archivo,sans-serif;color:#7d7979">Hero: CO — click a seat to change</span>
+</div>
+
+<div style="padding:16px 20px 20px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#605d5d;margin-bottom:10px">Action log</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;font:400 12.5px/1.9 Archivo,sans-serif">
+<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(32,30,29,.14)"><span style="color:#7d7979">Preflop</span><span style="color:#7d7979">7.00 BB</span></div>
+<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(32,30,29,.14)"><span style="color:#7d7979">Flop</span><span style="color:#7d7979">4♠ T♦ K♥</span></div>
+<div style="border-bottom:1px solid rgba(32,30,29,.08)">UTG folds</div><div style="border-bottom:1px solid rgba(32,30,29,.08)"><strong style="font-weight:800;color:#ec3013">CO bets 3.00 BB</strong></div>
+<div style="border-bottom:1px solid rgba(32,30,29,.08)">HJ folds</div><div style="border-bottom:1px solid rgba(32,30,29,.08)">BB folds</div>
+<div style="border-bottom:1px solid rgba(32,30,29,.08)">CO raises to 3.00 BB</div><div style="border-bottom:1px solid rgba(32,30,29,.08);color:#7d7979">SB to act…</div>
+<div style="border-bottom:1px solid rgba(32,30,29,.08)">BTN folds</div><div></div>
+<div style="border-bottom:1px solid rgba(32,30,29,.08)">SB calls</div><div></div>
+</div>
+</div>
+</div>
+
+<div>
+<div style="padding:18px 20px;border-bottom:2px solid rgba(32,30,29,.4)">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px">Situation</div>
+<div style="display:grid;grid-template-columns:88px minmax(0,1fr);gap:6px 12px;font:400 12.5px Archivo,sans-serif">
+<span style="color:#7d7979">Hero</span><span>CO · flop · CO_vs_SB · SRP</span>
+<span style="color:#7d7979">Facing</span><span>First to act · SPR 13–20</span>
+<span style="color:#7d7979">Texture</span><span>K-high rainbow</span>
+<span style="color:#7d7979">Pot / eff.</span><span><strong style="font-weight:800">7.0</strong> / 97.0 BB</span>
+</div>
+</div>
+
+<div style="padding:18px 20px;border-bottom:2px solid rgba(32,30,29,.4)">
+<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase">Similar real hands</div>
+<div style="font:400 11px Archivo,sans-serif;color:#7d7979">888poker</div>
+</div>
+<div style="display:flex;margin-bottom:12px">
+<button style="border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;letter-spacing:.04em;cursor:pointer;color:#605d5d">Exact</button>
+<button style="border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;letter-spacing:.04em;cursor:pointer;color:#605d5d">+Board</button>
+<button style="border:1px solid #ec3013;border-right:0;background:#ec3013;color:#f3f2f2;padding:6px 9px;font:800 10.5px Archivo,sans-serif;letter-spacing:.04em;cursor:pointer">+SPR</button>
+<button style="border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;letter-spacing:.04em;cursor:pointer;color:#605d5d">+Facing</button>
+<button style="border:1px solid rgba(32,30,29,.3);background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;letter-spacing:.04em;cursor:pointer;color:#605d5d">Any position</button>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1.5fr) repeat(4,minmax(0,1fr));font:400 12px Archivo,sans-serif;font-variant-numeric:tabular-nums">
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;padding:0 0 6px;border-bottom:2px solid rgba(32,30,29,.4)">Match</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;padding:0 0 6px;border-bottom:2px solid rgba(32,30,29,.4);text-align:right">Hands</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;padding:0 0 6px;border-bottom:2px solid rgba(32,30,29,.4);text-align:right">Avg pot</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;padding:0 0 6px;border-bottom:2px solid rgba(32,30,29,.4);text-align:right">Won</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;padding:0 0 6px;border-bottom:2px solid rgba(32,30,29,.4);text-align:right">bb/100</div>
+
+<div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);color:#7d7979">Exact</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">0</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">—</div>
+
+<div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);color:#7d7979">Any connectedness</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">0</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#7d7979">—</div>
+
+<div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);background:#ffe0d9;font-weight:600">Similar SPR</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;background:#ffe0d9">0</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;background:#ffe0d9">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;background:#ffe0d9">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;background:#ffe0d9">—</div>
+
+<div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14)">Similar board</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right">176</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right">14.2</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right">53.8%</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;color:#ae1800;font-weight:800">−132.3</div>
+
+<div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14)">Any position</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right">3370</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right">14.2</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right">57.7%</div><div style="padding:7px 0;border-bottom:1px solid rgba(32,30,29,.14);text-align:right;font-weight:800">130.8</div>
+</div>
+<button style="width:100%;margin-top:14px;border:1px solid #ec3013;background:#ec3013;color:#f3f2f2;padding:11px 14px;font:800 12px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;text-align:left;cursor:pointer" style-hover="background:#dd2b0f">Find matching real hands</button>
+<div style="margin-top:10px;font:400 11.5px/1.5 Archivo,sans-serif;color:#7d7979">Select a hand row to replay it on the table.</div>
+</div>
+
+<div style="padding:18px 20px">
+<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase">Solve spot</div>
+<div style="margin-left:auto;font:600 10px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#f3f2f2;background:#201e1d;padding:3px 7px">Running</div>
+</div>
+<div style="display:flex;margin-bottom:12px">
+<button style="flex:1;border:1px solid rgba(32,30,29,.3);border-right:0;background:transparent;padding:8px 10px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#605d5d;text-align:left">Final state only</button>
+<button style="flex:1;border:1px solid #201e1d;background:#201e1d;color:#f3f2f2;padding:8px 10px;font:800 11px Archivo,sans-serif;cursor:pointer;text-align:left">Every decision</button>
+</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d;margin-bottom:7px">Bet sizes in the tree</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+<span style="border:1px solid #201e1d;background:#201e1d;color:#f3f2f2;padding:5px 8px;font:600 11px Archivo,sans-serif">0.33×</span>
+<span style="border:1px solid #201e1d;background:#201e1d;color:#f3f2f2;padding:5px 8px;font:600 11px Archivo,sans-serif">0.5×</span>
+<span style="border:1px solid #201e1d;background:#201e1d;color:#f3f2f2;padding:5px 8px;font:600 11px Archivo,sans-serif">0.66×</span>
+<span style="border:1px solid #201e1d;background:#201e1d;color:#f3f2f2;padding:5px 8px;font:600 11px Archivo,sans-serif">0.75×</span>
+<span style="border:1px solid #201e1d;background:#201e1d;color:#f3f2f2;padding:5px 8px;font:600 11px Archivo,sans-serif">1×</span>
+<span style="border:1px solid rgba(32,30,29,.3);padding:5px 8px;font:600 11px Archivo,sans-serif;color:#605d5d">1.25×</span>
+<span style="border:1px solid rgba(32,30,29,.3);padding:5px 8px;font:600 11px Archivo,sans-serif;color:#605d5d">1.5×</span>
+<span style="border:1px solid #201e1d;background:#201e1d;color:#f3f2f2;padding:5px 8px;font:600 11px Archivo,sans-serif">2×</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+<span style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Iterations</span>
+<div style="border:1px solid rgba(32,30,29,.4);padding:7px 10px;font:600 13px Archivo,sans-serif;background:#f8f4f4;width:76px">200</div>
+<span style="font:400 11px Archivo,sans-serif;color:#7d7979">Full 3-street solve — minutes</span>
+</div>
+<div style="border-top:2px solid rgba(32,30,29,.4);padding-top:12px">
+<div style="display:flex;justify-content:space-between;font:600 11.5px Archivo,sans-serif;margin-bottom:6px"><span>Flop · CO (hero, IP) vs SB</span><span style="color:#7d7979">51 / 200 · expl. 5.07%</span></div>
+<div style="height:8px;background:rgba(32,30,29,.14)"><div style="width:26%;height:8px;background:#ec3013"></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Modernist inverted — dark ground throughout, same red and 2px rules</div>
+<div class="dv-card" style="width:1360px;background:#201e1d;color:#f3f2f2;border-color:rgba(243,242,242,.3)">
+
+<div style="display:flex;align-items:stretch;border-bottom:2px solid rgba(243,242,242,.35)">
+<div style="display:flex;align-items:center;padding:0 20px;font:800 15px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase;border-right:2px solid rgba(243,242,242,.35)">Poker<span style="color:#ff563c">Flow</span></div>
+<div style="display:flex">
+<div style="padding:16px 22px;font:800 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;border-right:1px solid rgba(243,242,242,.2);border-bottom:3px solid #ff563c">Hand builder</div>
+<div style="padding:16px 22px;font:600 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;border-right:1px solid rgba(243,242,242,.2)">Explorer</div>
+<div style="padding:16px 22px;font:600 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;border-right:1px solid rgba(243,242,242,.2)">Query</div>
+</div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:10px;padding:0 16px">
+<span style="font:600 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9b9797">Players</span>
+<div style="border:1px solid rgba(243,242,242,.35);padding:6px 10px;font:600 13px Archivo,sans-serif;background:#2d2b2b">6 ▾</div>
+<span style="font:600 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9b9797">Stacks BB</span>
+<div style="border:1px solid rgba(243,242,242,.35);padding:6px 10px;font:600 13px Archivo,sans-serif;background:#2d2b2b;width:64px">100</div>
+<button style="border:1px solid rgba(243,242,242,.35);background:transparent;color:#f3f2f2;padding:7px 12px;font:800 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(243,242,242,.1)">Undo</button>
+<button style="border:1px solid rgba(243,242,242,.35);background:transparent;color:#f3f2f2;padding:7px 12px;font:800 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(243,242,242,.1)">Reset hand</button>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 432px">
+<div style="border-right:2px solid rgba(243,242,242,.35)">
+<div style="padding:24px 24px 20px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9b9797">Table · 6-max · 100 BB deep</div>
+<div style="display:flex;gap:0">
+<span style="border:1px solid rgba(243,242,242,.25);border-right:0;padding:5px 12px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797">Preflop</span>
+<span style="border:1px solid #ff563c;background:#ff563c;color:#201e1d;padding:5px 12px;font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase">Flop</span>
+<span style="border:1px solid rgba(243,242,242,.25);border-left:0;padding:5px 12px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Turn</span>
+<span style="border:1px solid rgba(243,242,242,.25);border-left:0;padding:5px 12px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">River</span>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:rgba(243,242,242,.2);border:2px solid rgba(243,242,242,.2)">
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#605d5d">UTG</span><span style="font:600 11px Archivo,sans-serif;color:#605d5d;margin-left:auto">100</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#2d2b2b"></div><div style="width:30px;height:42px;background:#2d2b2b"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#605d5d">HJ</span><span style="font:600 11px Archivo,sans-serif;color:#605d5d;margin-left:auto">100</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#2d2b2b"></div><div style="width:30px;height:42px;background:#2d2b2b"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+<div style="background:#2d2b2b;padding:14px 16px;box-shadow:inset 0 0 0 2px #ff563c">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em">CO</span><span style="background:#ff563c;color:#201e1d;font:800 9px Archivo,sans-serif;letter-spacing:.1em;padding:2px 5px">HERO</span><span style="font:600 11px Archivo,sans-serif;margin-left:auto">97</span></div>
+<div style="display:flex;gap:3px">
+<div style="width:30px;height:42px;background:#f8f4f4;color:#ec3013;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">Q<div style="font-size:13px;line-height:1">♥</div></div>
+<div style="width:30px;height:42px;background:#f8f4f4;color:#ec3013;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">J<div style="font-size:13px;line-height:1">♥</div></div>
+</div>
+<div style="margin-top:8px;font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#ff9783">Bet 3.00 BB</div>
+</div>
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#9b9797">BB</span><span style="font:600 11px Archivo,sans-serif;color:#9b9797;margin-left:auto">99</span></div>
+<div style="display:flex;gap:3px">
+<div style="width:30px;height:42px;background:#605d5d;color:#2d2b2b;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">K<div style="font-size:13px;line-height:1">♦</div></div>
+<div style="width:30px;height:42px;background:#605d5d;color:#2d2b2b;padding:3px 4px;font:800 15px/1 Archivo,sans-serif">J<div style="font-size:13px;line-height:1">♠</div></div>
+</div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+<div style="background:#2d2b2b;padding:20px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:12px">
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9b9797">Board · K-high rainbow</div>
+<div style="display:flex;gap:4px">
+<div style="width:44px;height:62px;background:#f8f4f4;color:#201e1d;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">4<div style="font-size:18px;line-height:1.1">♠</div></div>
+<div style="width:44px;height:62px;background:#f8f4f4;color:#ec3013;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">T<div style="font-size:18px;line-height:1.1">♦</div></div>
+<div style="width:44px;height:62px;background:#f8f4f4;color:#ec3013;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">K<div style="font-size:18px;line-height:1.1">♥</div></div>
+<div style="width:44px;height:62px;border:2px dashed #444141"></div>
+<div style="width:44px;height:62px;border:2px dashed #444141"></div>
+</div>
+<div style="font:800 26px/1 Archivo,sans-serif;letter-spacing:-.02em">POT 7.00 BB</div>
+<div style="font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797">Last: BB folds</div>
+</div>
+<div style="background:#201e1d;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;color:#605d5d">BTN</span><span style="border:1px solid #605d5d;color:#605d5d;font:800 9px Archivo,sans-serif;padding:1px 4px">D</span><span style="font:600 11px Archivo,sans-serif;color:#605d5d;margin-left:auto">100</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#2d2b2b"></div><div style="width:30px;height:42px;background:#2d2b2b"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#605d5d">Folded</div>
+</div>
+<div style="background:#201e1d;padding:14px 16px"></div>
+<div style="background:#2d2b2b;padding:14px 16px;box-shadow:inset 0 0 0 2px #f3f2f2">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em">SB</span><span style="background:#f3f2f2;color:#201e1d;font:800 9px Archivo,sans-serif;letter-spacing:.1em;padding:2px 5px">TO ACT</span><span style="font:600 11px Archivo,sans-serif;margin-left:auto">97</span></div>
+<div style="display:flex;gap:3px"><div style="width:30px;height:42px;background:#444141"></div><div style="width:30px;height:42px;background:#444141"></div></div>
+<div style="margin-top:8px;font:600 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797">Facing 3.00 BB</div>
+</div>
+<div style="background:#201e1d;padding:14px 16px"></div>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;padding:14px 24px;border-top:2px solid rgba(243,242,242,.35);border-bottom:2px solid rgba(243,242,242,.35);flex-wrap:wrap">
+<span style="font:800 11px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;margin-right:6px">SB to act</span>
+<button style="border:1px solid rgba(243,242,242,.35);background:transparent;color:#f3f2f2;padding:9px 16px;font:800 12px Archivo,sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer" style-hover="border-color:#ff563c;color:#ff563c">Fold</button>
+<button style="border:1px solid rgba(243,242,242,.35);background:transparent;color:#f3f2f2;padding:9px 16px;font:800 12px Archivo,sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(243,242,242,.1)">Call 3.00</button>
+<div style="border:1px solid rgba(243,242,242,.35);padding:9px 12px;font:600 13px Archivo,sans-serif;color:#9b9797;background:#2d2b2b;width:92px">6.5+</div>
+<button style="border:1px solid #ff563c;background:#ff563c;color:#201e1d;padding:9px 18px;font:800 12px Archivo,sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer" style-hover="background:#ff9783">Raise to</button>
+<div style="display:flex">
+<button style="border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#9b9797">⅓ pot</button>
+<button style="border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#9b9797">½ pot</button>
+<button style="border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#9b9797">⅔ pot</button>
+<button style="border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#9b9797">pot</button>
+<button style="border:1px solid rgba(243,242,242,.25);background:transparent;padding:8px 11px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#9b9797">all-in</button>
+</div>
+<span style="margin-left:auto;font:400 11px Archivo,sans-serif;color:#9b9797">Hero: CO — click a seat to change</span>
+</div>
+
+<div style="padding:16px 24px 22px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9b9797;margin-bottom:10px">Action log</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;font:400 12.5px/1.9 Archivo,sans-serif">
+<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(243,242,242,.2)"><span style="color:#9b9797">Preflop</span><span style="color:#9b9797">7.00 BB</span></div>
+<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(243,242,242,.2)"><span style="color:#9b9797">Flop</span><span style="color:#9b9797">4♠ T♦ K♥</span></div>
+<div style="border-bottom:1px solid rgba(243,242,242,.1)">UTG folds</div><div style="border-bottom:1px solid rgba(243,242,242,.1)"><strong style="font-weight:800;color:#ff563c">CO bets 3.00 BB</strong></div>
+<div style="border-bottom:1px solid rgba(243,242,242,.1)">HJ folds</div><div style="border-bottom:1px solid rgba(243,242,242,.1)">BB folds</div>
+<div style="border-bottom:1px solid rgba(243,242,242,.1)">CO raises to 3.00 BB</div><div style="border-bottom:1px solid rgba(243,242,242,.1);color:#9b9797">SB to act…</div>
+<div style="border-bottom:1px solid rgba(243,242,242,.1)">BTN folds</div><div></div>
+<div style="border-bottom:1px solid rgba(243,242,242,.1)">SB calls</div><div></div>
+</div>
+</div>
+</div>
+
+<div>
+<div style="padding:18px 20px;border-bottom:2px solid rgba(243,242,242,.35)">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px">Situation</div>
+<div style="display:grid;grid-template-columns:88px minmax(0,1fr);gap:6px 12px;font:400 12.5px Archivo,sans-serif">
+<span style="color:#9b9797">Hero</span><span>CO · flop · CO_vs_SB · SRP</span>
+<span style="color:#9b9797">Facing</span><span>First to act · SPR 13–20</span>
+<span style="color:#9b9797">Texture</span><span>K-high rainbow</span>
+<span style="color:#9b9797">Pot / eff.</span><span><strong style="font-weight:800">7.0</strong> / 97.0 BB</span>
+</div>
+</div>
+
+<div style="padding:18px 20px;border-bottom:2px solid rgba(243,242,242,.35)">
+<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase">Similar real hands</div>
+<div style="font:400 11px Archivo,sans-serif;color:#9b9797">888poker</div>
+</div>
+<div style="display:flex;margin-bottom:12px">
+<button style="border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;cursor:pointer;color:#9b9797">Exact</button>
+<button style="border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;cursor:pointer;color:#9b9797">+Board</button>
+<button style="border:1px solid #ff563c;border-right:0;background:#ff563c;color:#201e1d;padding:6px 9px;font:800 10.5px Archivo,sans-serif;cursor:pointer">+SPR</button>
+<button style="border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;cursor:pointer;color:#9b9797">+Facing</button>
+<button style="border:1px solid rgba(243,242,242,.25);background:transparent;padding:6px 9px;font:600 10.5px Archivo,sans-serif;cursor:pointer;color:#9b9797">Any position</button>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1.5fr) repeat(4,minmax(0,1fr));font:400 12px Archivo,sans-serif;font-variant-numeric:tabular-nums">
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;padding:0 0 6px;border-bottom:2px solid rgba(243,242,242,.35)">Match</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;padding:0 0 6px;border-bottom:2px solid rgba(243,242,242,.35);text-align:right">Hands</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;padding:0 0 6px;border-bottom:2px solid rgba(243,242,242,.35);text-align:right">Avg pot</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;padding:0 0 6px;border-bottom:2px solid rgba(243,242,242,.35);text-align:right">Won</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;padding:0 0 6px;border-bottom:2px solid rgba(243,242,242,.35);text-align:right">bb/100</div>
+<div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);color:#605d5d">Exact</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">0</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">—</div>
+<div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);color:#605d5d">Any connectedness</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">0</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#605d5d">—</div>
+<div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);background:#471d16;font-weight:600">Similar SPR</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;background:#471d16">0</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;background:#471d16">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;background:#471d16">—</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;background:#471d16">—</div>
+<div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12)">Similar board</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right">176</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right">14.2</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right">53.8%</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;color:#ff9783;font-weight:800">−132.3</div>
+<div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12)">Any position</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right">3370</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right">14.2</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right">57.7%</div><div style="padding:7px 0;border-bottom:1px solid rgba(243,242,242,.12);text-align:right;font-weight:800">130.8</div>
+</div>
+<button style="width:100%;margin-top:14px;border:1px solid #ff563c;background:#ff563c;color:#201e1d;padding:11px 14px;font:800 12px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;text-align:left;cursor:pointer" style-hover="background:#ff9783">Find matching real hands</button>
+<div style="margin-top:10px;font:400 11.5px/1.5 Archivo,sans-serif;color:#9b9797">Select a hand row to replay it on the table.</div>
+</div>
+
+<div style="padding:18px 20px">
+<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase">Solve spot</div>
+<div style="margin-left:auto;font:600 10px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#201e1d;background:#ff563c;padding:3px 7px">Running</div>
+</div>
+<div style="display:flex;margin-bottom:12px">
+<button style="flex:1;border:1px solid rgba(243,242,242,.25);border-right:0;background:transparent;padding:8px 10px;font:600 11px Archivo,sans-serif;cursor:pointer;color:#9b9797;text-align:left">Final state only</button>
+<button style="flex:1;border:1px solid #f3f2f2;background:#f3f2f2;color:#201e1d;padding:8px 10px;font:800 11px Archivo,sans-serif;cursor:pointer;text-align:left">Every decision</button>
+</div>
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797;margin-bottom:7px">Bet sizes in the tree</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+<span style="border:1px solid #f3f2f2;background:#f3f2f2;color:#201e1d;padding:5px 8px;font:600 11px Archivo,sans-serif">0.33×</span>
+<span style="border:1px solid #f3f2f2;background:#f3f2f2;color:#201e1d;padding:5px 8px;font:600 11px Archivo,sans-serif">0.5×</span>
+<span style="border:1px solid #f3f2f2;background:#f3f2f2;color:#201e1d;padding:5px 8px;font:600 11px Archivo,sans-serif">0.66×</span>
+<span style="border:1px solid #f3f2f2;background:#f3f2f2;color:#201e1d;padding:5px 8px;font:600 11px Archivo,sans-serif">0.75×</span>
+<span style="border:1px solid #f3f2f2;background:#f3f2f2;color:#201e1d;padding:5px 8px;font:600 11px Archivo,sans-serif">1×</span>
+<span style="border:1px solid rgba(243,242,242,.25);padding:5px 8px;font:600 11px Archivo,sans-serif;color:#9b9797">1.25×</span>
+<span style="border:1px solid rgba(243,242,242,.25);padding:5px 8px;font:600 11px Archivo,sans-serif;color:#9b9797">1.5×</span>
+<span style="border:1px solid #f3f2f2;background:#f3f2f2;color:#201e1d;padding:5px 8px;font:600 11px Archivo,sans-serif">2×</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+<span style="font:800 10px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9b9797">Iterations</span>
+<div style="border:1px solid rgba(243,242,242,.35);padding:7px 10px;font:600 13px Archivo,sans-serif;background:#2d2b2b;width:76px">200</div>
+<span style="font:400 11px Archivo,sans-serif;color:#9b9797">Full 3-street solve — minutes</span>
+</div>
+<div style="border-top:2px solid rgba(243,242,242,.35);padding-top:12px">
+<div style="display:flex;justify-content:space-between;font:600 11.5px Archivo,sans-serif;margin-bottom:6px"><span>Flop · CO (hero, IP) vs SB</span><span style="color:#9b9797">51 / 200 · expl. 5.07%</span></div>
+<div style="height:8px;background:rgba(243,242,242,.18)"><div style="width:26%;height:8px;background:#ff563c"></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Solver view — your line vs solver line, 13×13 range grid</div>
+<div class="dv-card" style="width:1360px;background:#201e1d;color:#f3f2f2;border-color:rgba(243,242,242,.3)">
+
+<div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid rgba(243,242,242,.35)">
+<div style="font:800 13px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase">Solution · CO vs SB · SRP</div>
+<div style="display:flex;align-items:center;gap:6px;font:600 11px Archivo,sans-serif;color:#9b9797">
+<span style="color:#f3f2f2">4♠T♦K♥</span><span>›</span><span style="color:#f3f2f2">CO bet 3.0</span><span>›</span><span style="background:#ff563c;color:#201e1d;font-weight:800;padding:2px 6px">SB decision</span>
+</div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:14px;font:600 11px Archivo,sans-serif;color:#9b9797">
+<span>expl. <strong style="color:#f3f2f2;font-weight:800">0.41%</strong></span>
+<span>200 iters</span>
+<button style="border:1px solid rgba(243,242,242,.35);background:transparent;color:#f3f2f2;padding:7px 12px;font:800 11px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer" style-hover="background:rgba(243,242,242,.1)">Re-solve</button>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-bottom:2px solid rgba(243,242,242,.35)">
+<div style="border-right:2px solid rgba(243,242,242,.35);padding:18px 20px 20px">
+<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase">Your line</div>
+<div style="margin-left:auto;font:800 12px Archivo,sans-serif;color:#ff9783">−1.84 BB total EV</div>
+</div>
+<sc-for list="{{ yourLine }}" as="step" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:64px minmax(0,1fr) 78px;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(243,242,242,.12)">
+<span style="font:800 10px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9b9797">{{ step.street }}</span>
+<span style="font:600 13px Archivo,sans-serif">{{ step.action }}</span>
+<span style="font:800 12px Archivo,sans-serif;text-align:right;color:{{ step.evColor }}">{{ step.ev }}</span>
+</div>
+</sc-for>
+<div style="margin-top:16px;padding:12px 14px;background:#2d2b2b;border-left:3px solid #ff563c">
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ff9783;margin-bottom:5px">Largest leak</div>
+<div style="font:400 12.5px/1.5 Archivo,sans-serif">Betting 3.0 BB with QJ♥♥ on K-high rainbow. The solver checks this combo 71% of the time — your equity realises better as the caller.</div>
+</div>
+</div>
+
+<div style="padding:18px 20px 20px">
+<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase">Solver line</div>
+<div style="margin-left:auto;font:800 12px Archivo,sans-serif;color:#9b9797">baseline</div>
+</div>
+<sc-for list="{{ solverLine }}" as="step" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:64px minmax(0,1fr) 78px;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(243,242,242,.12)">
+<span style="font:800 10px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9b9797">{{ step.street }}</span>
+<span style="font:600 13px Archivo,sans-serif">{{ step.action }}</span>
+<span style="font:600 12px Archivo,sans-serif;text-align:right;color:#9b9797">{{ step.freq }}</span>
+</div>
+</sc-for>
+<div style="margin-top:16px;padding:12px 14px;background:#2d2b2b">
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9b9797;margin-bottom:8px">Action mix at this node</div>
+<div style="display:flex;height:26px;margin-bottom:8px">
+<div style="width:64%;background:#9b9797"></div>
+<div style="width:22%;background:#ff9783"></div>
+<div style="width:14%;background:#ff563c"></div>
+</div>
+<div style="display:flex;gap:16px;font:600 10.5px Archivo,sans-serif;color:#9b9797">
+<span><span style="display:inline-block;width:9px;height:9px;background:#9b9797;margin-right:5px"></span>Check 64%</span>
+<span><span style="display:inline-block;width:9px;height:9px;background:#ff9783;margin-right:5px"></span>Bet 33% pot · 22%</span>
+<span><span style="display:inline-block;width:9px;height:9px;background:#ff563c;margin-right:5px"></span>Bet 75% pot · 14%</span>
+</div>
+</div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 400px">
+<div style="padding:20px;border-right:2px solid rgba(243,242,242,.35)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase">Hero range · 13×13</div>
+<div style="font:400 11px Archivo,sans-serif;color:#9b9797">Cell fill = action frequency · QJs highlighted</div>
+</div>
+<div style="display:inline-flex;flex-direction:column;gap:2px">
+<div style="display:flex;gap:2px">
+<div style="width:22px"></div>
+<sc-for list="{{ ranks }}" as="r" hint-placeholder-count="13">
+<div style="width:34px;text-align:center;font:600 10px Archivo,sans-serif;color:#605d5d">{{ r }}</div>
+</sc-for>
+</div>
+<sc-for list="{{ gridRows }}" as="row" hint-placeholder-count="13">
+<div style="display:flex;gap:2px;align-items:center">
+<div style="width:22px;font:600 10px Archivo,sans-serif;color:#605d5d">{{ row.rank }}</div>
+<sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="13">
+<div style="width:34px;height:26px;position:relative;background:{{ cell.bg }};box-shadow:{{ cell.ring }}">
+<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:600 9.5px Archivo,sans-serif;color:{{ cell.fg }}">{{ cell.label }}</span>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;gap:18px;margin-top:14px;font:600 10.5px Archivo,sans-serif;color:#9b9797">
+<span><span style="display:inline-block;width:10px;height:10px;background:#444141;margin-right:6px"></span>Fold / not in range</span>
+<span><span style="display:inline-block;width:10px;height:10px;background:#9b9797;margin-right:6px"></span>Check</span>
+<span><span style="display:inline-block;width:10px;height:10px;background:#ff9783;margin-right:6px"></span>Bet 33%</span>
+<span><span style="display:inline-block;width:10px;height:10px;background:#ff563c;margin-right:6px"></span>Bet 75%</span>
+</div>
+</div>
+
+<div style="padding:20px">
+<div style="font:800 11px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px">QJ♥♥ — your combo</div>
+<div style="display:flex;gap:4px;margin-bottom:16px">
+<div style="width:44px;height:62px;background:#f8f4f4;color:#ec3013;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">Q<div style="font-size:18px;line-height:1.1">♥</div></div>
+<div style="width:44px;height:62px;background:#f8f4f4;color:#ec3013;padding:5px 6px;font:800 22px/1 Archivo,sans-serif">J<div style="font-size:18px;line-height:1.1">♥</div></div>
+<div style="margin-left:12px;display:flex;flex-direction:column;justify-content:center;gap:3px">
+<div style="font:400 11px Archivo,sans-serif;color:#9b9797">Backdoor flush + gutshot</div>
+<div style="font:800 13px Archivo,sans-serif">31.4% equity vs SB range</div>
+</div>
+</div>
+<sc-for list="{{ comboActions }}" as="a" hint-placeholder-count="3">
+<div style="margin-bottom:12px">
+<div style="display:flex;justify-content:space-between;font:600 12px Archivo,sans-serif;margin-bottom:4px"><span>{{ a.label }}</span><span style="color:#9b9797">{{ a.pct }} · EV {{ a.ev }}</span></div>
+<div style="height:10px;background:rgba(243,242,242,.14)"><div style="height:10px;width:{{ a.width }};background:{{ a.color }}"></div></div>
+</div>
+</sc-for>
+<div style="margin-top:18px;border-top:2px solid rgba(243,242,242,.35);padding-top:14px">
+<div style="font:800 10px Archivo,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9b9797;margin-bottom:8px">Real hands in this spot</div>
+<div style="font:400 12.5px/1.6 Archivo,sans-serif">176 similar-board hands in the 888poker set. Hero-position players bet here <strong style="font-weight:800">68%</strong> of the time — 46 points above the solver.</div>
+<button style="width:100%;margin-top:12px;border:1px solid #ff563c;background:#ff563c;color:#201e1d;padding:11px 14px;font:800 12px Archivo,sans-serif;letter-spacing:.08em;text-transform:uppercase;text-align:left;cursor:pointer" style-hover="background:#ff9783">Replay those hands</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#1b">1b</a>, but keep the light rail from <a class="dv-oid" href="#1a">1a</a>" · "make the range grid in <a class="dv-oid" href="#1c">1c</a> bigger and add street tabs" · "show the solved-line overlay on the table"</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const VAL = {A:14,K:13,Q:12,J:11,T:10,9:9,8:8,7:7,6:6,5:5,4:4,3:3,2:2};
+
+class Component extends DCLogic {
+  renderVals() {
+    // Score every cell, then assign buckets by percentile so the grid's
+    // aggregate mix matches the stated node mix (Check 64 / Bet 33% 22 / Bet 75% 14).
+    const cells = [];
+    RANKS.forEach((rowRank, ri) => RANKS.forEach((colRank, ci) => {
+      const suited = ri < ci;
+      const pair = ri === ci;
+      const hi = Math.max(VAL[rowRank], VAL[colRank]);
+      const lo = Math.min(VAL[rowRank], VAL[colRank]);
+      const gap = hi - lo;
+      let s = (hi - 2) / 12 * 0.55 + (lo - 2) / 12 * 0.3;
+      if (pair) s += 0.35;
+      if (suited) s += 0.12;
+      if (gap <= 2 && !pair) s += 0.08;
+      s -= gap * 0.02;
+      const label = pair ? rowRank + rowRank
+        : (suited ? rowRank + colRank + 's' : colRank + rowRank + 'o');
+      cells.push({ ri, ci, s, label });
+    }));
+
+    // Bottom third of the score range is out of a CO opening range.
+    const inRange = cells.filter(c => c.s > 0.36).sort((a, b) => b.s - a.s);
+    const n = inRange.length;
+    const bet75 = Math.round(n * 0.14);
+    const bet33 = Math.round(n * 0.22);
+    const bucket = new Map();
+    inRange.forEach((c, i) => {
+      bucket.set(c.label, i < bet75 ? 'bet75' : i < bet75 + bet33 ? 'bet33' : 'check');
+    });
+
+    const FILL = {
+      bet75: { bg: '#ff563c', fg: '#201e1d' },
+      bet33: { bg: '#ff9783', fg: '#201e1d' },
+      check: { bg: '#9b9797', fg: '#201e1d' },
+      fold: { bg: '#444141', fg: '#9b9797' },
+    };
+
+    const byPos = new Map(cells.map(c => [c.ri + ':' + c.ci, c]));
+    const gridRows = RANKS.map((rowRank, ri) => ({
+      rank: rowRank,
+      cells: RANKS.map((colRank, ci) => {
+        const c = byPos.get(ri + ':' + ci);
+        // The highlighted combo must read the way its own panel reads: mostly check.
+        const kind = c.label === 'QJs' ? 'check' : (bucket.get(c.label) || 'fold');
+        const fill = FILL[kind];
+        return {
+          label: c.label,
+          bg: fill.bg,
+          fg: fill.fg,
+          ring: c.label === 'QJs' ? 'inset 0 0 0 2px #f3f2f2' : 'none',
+        };
+      }),
+    }));
+
+    return {
+      ranks: RANKS,
+      gridRows,
+      yourLine: [
+        { street: 'Preflop', action: 'CO opens 2.5 BB', ev: '+0.32', evColor: '#f3f2f2' },
+        { street: 'Flop', action: 'CO bets 3.0 BB (43% pot)', ev: '−1.84', evColor: '#ff563c' },
+        { street: 'Flop', action: 'SB folds', ev: '—', evColor: '#9b9797' },
+      ],
+      solverLine: [
+        { street: 'Preflop', action: 'CO opens 2.5 BB', freq: '86%' },
+        { street: 'Flop', action: 'CO checks', freq: '71%' },
+        { street: 'Turn', action: 'Bet 33% pot on brick', freq: '58%' },
+      ],
+      comboActions: [
+        { label: 'Check', pct: '71%', ev: '+2.10', width: '71%', color: '#9b9797' },
+        { label: 'Bet 33% pot', pct: '21%', ev: '+1.94', width: '21%', color: '#ff9783' },
+        { label: 'Bet 75% pot', pct: '8%', ev: '+0.26', width: '8%', color: '#ff563c' },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
